@@ -172,6 +172,9 @@ function renderLanding() {
       </button>
       <button class="btn btn-ghost btn-lg" onclick="window.enterApp()">View demo →</button>
     </div>
+    <div class="hero-image-wrap">
+      <img src="assets/hero.png" alt="Unblocked AI Dashboard" class="hero-image">
+    </div>
     <div class="social-proof">
       <div class="avatars">
         <div class="avatar" style="background:linear-gradient(135deg,#667eea,#764ba2)">AK</div>
