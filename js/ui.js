@@ -181,6 +181,14 @@ export function truncate(str, max = 100) {
   return str.length > max ? str.slice(0, max) + '…' : str;
 }
 
+// ── TIME GREETING ────────────────────────────────────────────────
+export function getTimeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 // ── RISK ICON ─────────────────────────────────────────────────────
 export const ICONS = {
   dashboard:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
