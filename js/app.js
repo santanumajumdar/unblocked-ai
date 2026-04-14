@@ -9,12 +9,15 @@ import {
   getStats
 } from './programs.js';
 
-import { generateStatusUpdate, getApiKey, setApiKey, clearApiKey, hasApiKey } from './api.js';
+import {
+  generateStatusUpdate, getApiKey, setApiKey, clearApiKey, hasApiKey,
+  getProvider, setProvider
+} from './api.js';
 
 import {
   toast, openModal, confirm as uiConfirm, copyText,
   formatDate, daysAgo, ragBadge, ragEmoji, ragLabel,
-  personaBadge, severityBadge, truncate,
+  personaBadge, severityBadge, truncate, getTimeGreeting,
   setButtonLoading, scrollToTop, PERSONA_LABELS, ICONS
 } from './ui.js';
 
@@ -82,49 +85,101 @@ function renderPage(name) {
 }
 
 // ── ENTER APP ─────────────────────────────────────────────────────
-window.enterApp = function() {
+window.enterApp = function(targetPage = 'dashboard') {
   if (!hasApiKey()) {
     showApiKeyModal(() => {
       showPage('app');
-      showAppPage('dashboard');
+      showAppPage(targetPage);
     });
   } else {
     showPage('app');
-    showAppPage('dashboard');
+    showAppPage(targetPage);
   }
 };
 
 function showApiKeyModal(onSuccess) {
+  let activeTab = 'anthropic';
+
   const { el, close } = openModal(`
     <div class="modal-logo">
       <div class="logo-mark">U</div>
       <div class="logo-wordmark">Un<span>blocked</span> AI</div>
     </div>
-    <div class="modal-title">Add your API key to get started</div>
-    <div class="modal-sub">Unblocked AI uses the Claude API for real-time status generation. Your key is stored only in your browser — never on any server.</div>
-    <div class="form-group">
-      <label class="form-label">Anthropic API key <span class="required">*</span></label>
-      <input type="password" id="modal-api-key" placeholder="sk-ant-api03-…" autocomplete="off">
+    <div class="modal-title">Select your AI provider</div>
+    <div class="modal-sub">Choose a free or premium provider to power your status intelligence.</div>
+
+    <div class="provider-tabs">
+      <div class="p-tab active" data-p="anthropic">Claude (Anthropic)</div>
+      <div class="p-tab" data-p="gemini">Gemini (Google)</div>
     </div>
-    <button class="btn btn-primary btn-block" id="modal-save-key">Save key and continue</button>
-    <div class="modal-note">
-      Don't have a key? <a href="https://console.anthropic.com" target="_blank">Get one free at console.anthropic.com</a><br>
-      Your key is sent only to <strong>api.anthropic.com</strong> — never stored on our servers. Free forever.
+
+    <div class="form-group mt-16">
+      <label class="form-label" id="key-label">Anthropic API key <span class="required">*</span></label>
+      <input type="password" id="modal-api-key" placeholder="sk-ant-…" autocomplete="off">
     </div>
+
+    <div id="provider-note" class="modal-note mb-16" style="margin-top:-8px; font-style:italic;">
+      Claude 3.5 Sonnet requires a paid key from Anthropic.
+    </div>
+
+    <button class="btn btn-primary btn-block" id="modal-save-key">Save key and activate</button>
+
+    <div class="modal-divider-text"><span>OR</span></div>
+
+    <button class="btn btn-ghost btn-block" id="modal-demo-mode" style="border-color:var(--blue-dim); color:var(--blue-light);">
+      Try Demo Mode — No key required
+    </button>
   `);
+
   const input = el.querySelector('#modal-api-key');
+  const label = el.querySelector('#key-label');
+  const note  = el.querySelector('#provider-note');
+  const tabs  = el.querySelectorAll('.p-tab');
   const saveBtn = el.querySelector('#modal-save-key');
+  const demoBtn = el.querySelector('#modal-demo-mode');
+
+  tabs.forEach(tab => {
+    tab.onclick = () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeTab = tab.dataset.p;
+      if (activeTab === 'gemini') {
+        label.innerHTML = 'Google Gemini API key <span class="required">*</span>';
+        input.placeholder = 'AIza…';
+        note.innerHTML = 'Gemini 1.5 Flash is <strong>free</strong> for up to 15 requests/min. <a href="https://aistudio.google.com/" target="_blank">Get free key →</a>';
+      } else {
+        label.innerHTML = 'Anthropic API key <span class="required">*</span>';
+        input.placeholder = 'sk-ant-…';
+        note.innerHTML = 'Claude 3.5 Sonnet requires a paid key from Anthropic. <a href="https://console.anthropic.com/" target="_blank">Get key →</a>';
+      }
+    };
+  });
+
   input.focus();
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveBtn.click(); });
+
   saveBtn.addEventListener('click', () => {
     const key = input.value.trim();
-    if (!key.startsWith('sk-ant')) {
-      toast('Invalid key format — should start with sk-ant', 'error');
-      return;
+    if (!key) { toast('Please enter a key', 'error'); return; }
+    if (activeTab === 'anthropic' && !key.startsWith('sk-ant')) {
+      toast('Invalid Claude key — should start with sk-ant', 'error'); return;
     }
-    setApiKey(key);
+    if (activeTab === 'gemini' && !key.startsWith('AIza')) {
+      toast('Invalid Gemini key — usually starts with AIza', 'error'); return;
+    }
+
+    setProvider(activeTab);
+    setApiKey(key, activeTab);
     close();
-    toast('API key saved!', 'success');
+    toast(`${activeTab === 'gemini' ? 'Gemini' : 'Claude'} activated!`, 'success');
+    if (onSuccess) onSuccess();
+  });
+
+  demoBtn.addEventListener('click', () => {
+    setProvider('anthropic');
+    setApiKey('sk-demo-mode', 'anthropic');
+    close();
+    toast('Demo Mode activated!', 'info');
     if (onSuccess) onSuccess();
   });
 }
@@ -182,17 +237,17 @@ function renderLanding() {
       <span>Used by 1,200+ TPMs at leading tech companies</span>
     </div>
     <div class="landing-features">
-      <div class="feature-card">
+      <div class="feature-card" onclick="enterApp('generate')">
         <div class="feature-icon">${ICONS.generate}</div>
         <div class="feature-title">Role-aware personas</div>
         <div class="feature-desc">Exec BLUF, PM narrative, engineer deep-dive, steering committee brief — one click, four outputs, zero rewriting.</div>
       </div>
-      <div class="feature-card">
+      <div class="feature-card" onclick="enterApp('history')">
         <div class="feature-icon">${ICONS.history}</div>
         <div class="feature-title">Program memory</div>
         <div class="feature-desc">AI remembers your program history, past decisions, and signals. Every update gets smarter over time.</div>
       </div>
-      <div class="feature-card">
+      <div class="feature-card" onclick="enterApp('risks')">
         <div class="feature-icon">${ICONS.risks}</div>
         <div class="feature-title">Risk Radar</div>
         <div class="feature-desc">Automatically surfaces blockers, velocity drops, and missed milestones so your status is always complete and honest.</div>
@@ -256,7 +311,7 @@ function renderDashboard() {
   el.innerHTML = `
     <div class="page-header">
       <div>
-        <div class="page-title">Good morning, <em>${getDisplayName()}</em></div>
+        <div class="page-title">${getTimeGreeting()}, <em>${getDisplayName()}</em></div>
         <div class="page-subtitle">${needsUpdate.length > 0 ? `${needsUpdate.length} program${needsUpdate.length > 1 ? 's' : ''} due for a status update.` : 'All programs are up to date.'}</div>
       </div>
       <button class="btn btn-primary" onclick="showAppPage('generate')">
@@ -980,20 +1035,28 @@ function renderSettings() {
       </div>
 
       <div class="settings-section">
-        <div class="settings-title">API key (Claude)</div>
-        <div class="${hasKey ? 'free-badge' : 'api-banner'}" style="margin-bottom:14px;">
-          ${hasKey
-            ? `<div style="font-size:13px;font-weight:500;color:var(--success);margin-bottom:3px;">✓ API key connected</div><div style="font-size:12.5px;color:var(--text-muted);">Your key is stored in your browser only — never on any server.</div>`
-            : `${ICONS.warning} No API key set — AI generation is disabled.`}
+        <div class="settings-title">AI Provider & API</div>
+        
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name">AI Provider</div>
+            <div class="setting-desc">Choose which AI powers your generations</div>
+          </div>
+          <select id="s-provider" style="width:170px;" onchange="window.changeProvider(this.value)">
+            <option value="anthropic" ${getProvider()==='anthropic'?'selected':''}>Claude (Anthropic)</option>
+            <option value="gemini"    ${getProvider()==='gemini'?'selected':''}>Gemini (Google)</option>
+          </select>
         </div>
-        <div class="flex gap-8">
-          <button class="btn btn-secondary btn-sm" onclick="openApiKeyModal()">
-            ${hasKey ? 'Update key' : 'Add API key'}
-          </button>
-          ${hasKey ? `<button class="btn btn-ghost btn-sm text-danger" onclick="removeApiKey()">Remove key</button>` : ''}
-        </div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.55;">
-          Get your free API key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name">${getProvider()==='gemini'?'Gemini':'Claude'} API Key</div>
+            <div class="setting-desc">${getProvider()==='gemini'?'Free tier supported (up to 15 RPM)':'Professional tier (Sonnet 3.5)'}</div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="window.openApiKeyModal()">Update Key</button>
+            ${hasKey ? `<button class="btn btn-ghost btn-sm text-danger" onclick="removeApiKey()">Remove</button>` : ''}
+          </div>
         </div>
       </div>
 
@@ -1004,13 +1067,14 @@ function renderSettings() {
             <div class="setting-name">Default tone</div>
             <div class="setting-desc">How AI frames status updates by default</div>
           </div>
-          <select id="s-tone" style="width:190px;" onchange="savePref('tone',this.value)">
+          <select id="s-tone" style="width:170px;" onchange="savePref('tone',this.value)">
             <option value="balanced" ${(localStorage.getItem('unblocked_tone')||'balanced')==='balanced'?'selected':''}>Balanced</option>
-            <option value="direct"   ${localStorage.getItem('unblocked_tone')==='direct'  ?'selected':''}>Direct — no fluff</option>
+            <option value="direct"   ${localStorage.getItem('unblocked_tone')==='direct'  ?'selected':''}>Direct</option>
             <option value="reassuring" ${localStorage.getItem('unblocked_tone')==='reassuring'?'selected':''}>Reassuring</option>
             <option value="urgent"   ${localStorage.getItem('unblocked_tone')==='urgent'  ?'selected':''}>Urgent</option>
           </select>
         </div>
+      </div>
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-name">Escalation threshold</div>
@@ -1084,6 +1148,12 @@ window.savePref = function(key, value) {
 window.togglePref = function(key, toggleEl) {
   toggleEl.classList.toggle('on');
   localStorage.setItem('unblocked_' + key, toggleEl.classList.contains('on') ? 'true' : 'false');
+};
+
+window.changeProvider = function(val) {
+  setProvider(val);
+  renderSettings();
+  toast(`${val === 'gemini' ? 'Gemini' : 'Claude'} selected as provider`, 'info');
 };
 
 window.removeApiKey = function() {
