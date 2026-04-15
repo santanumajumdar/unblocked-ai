@@ -1344,15 +1344,28 @@ function renderDependencyMapper(container) {
 
   if (window.mermaid) {
     setTimeout(async () => {
+      // Create an off-screen element so Mermaid calculating text dimensions doesn't flash in the UI.
+      const offscreen = document.createElement('div');
+      offscreen.style.position = 'absolute';
+      offscreen.style.top = '-9999px';
+      offscreen.style.left = '-9999px';
+      offscreen.style.visibility = 'hidden';
+      document.body.appendChild(offscreen);
+
       try {
-        const id = 'mermaid-svg-' + Date.now();
-        const { svg } = await window.mermaid.render(id, graphDef);
+        const id = 'mermaidsvg' + Date.now();
+        const { svg } = await window.mermaid.render(id, graphDef, offscreen);
         const mc = document.getElementById('mermaid-container');
         if (mc) mc.innerHTML = svg;
       } catch (e) {
         console.error("Mermaid run failed", e);
         const mc = document.getElementById('mermaid-container');
         if (mc) mc.innerHTML = `<div style="color:var(--danger); font-size:13px;">Visual generation failed. Please check dependencies.</div>`;
+      } finally {
+        // Always clean up the hidden element
+        if (offscreen.parentNode) {
+          offscreen.parentNode.removeChild(offscreen);
+        }
       }
     }, 50);
   }
