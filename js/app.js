@@ -20,6 +20,10 @@ import {
 } from './auth.js';
 
 import { parseFile } from './parser.js';
+import { 
+  getIntegrations, saveIntegration, disconnectIntegration,
+  syncJiraData, syncGitHubData, publishToSlack
+} from './integrations.js';
 
 
 import {
@@ -88,6 +92,7 @@ function renderPage(name) {
     history:   renderHistory,
     risks:     renderRisks,
     visuals:   renderVisuals,
+    integrations: renderIntegrationsPage,
     settings:  renderSettings
   };
   if (renders[name]) renders[name]();
@@ -264,7 +269,8 @@ function renderApp() {
           <div id="apppage-programs"  class="app-page"></div>
           <div id="apppage-history"   class="app-page"></div>
           <div id="apppage-risks"     class="app-page"></div>
-          <div id="apppage-visuals"   class="app-page"></div>
+           <div id="apppage-visuals"   class="app-page"></div>
+          <div id="apppage-integrations" class="app-page"></div>
           <div id="apppage-settings"  class="app-page"></div>
         </div>
       </div>
@@ -337,7 +343,8 @@ function renderSidebar() {
       <div class="nav-item" id="nav-programs"  data-page="programs">${ICONS.programs} My Programs</div>
       <div class="nav-item" id="nav-history"   data-page="history">${ICONS.history} Update History</div>
       <div class="nav-item" id="nav-risks"     data-page="risks">${ICONS.risks} Risk Radar <span class="nav-pill nav-pill-red" id="risk-count-badge"></span></div>
-      <div class="nav-item" id="nav-visuals"   data-page="visuals">${ICONS.visuals} Portfolio Visuals <span class="nav-pill nav-pill-blue">NEW</span></div>
+       <div id="nav-visuals"   data-page="visuals" class="nav-item">${ICONS.visuals} Portfolio Visuals <span class="nav-pill nav-pill-blue">NEW</span></div>
+      <div id="nav-integrations" data-page="integrations" class="nav-item">${ICONS.slack} Integrations <span class="nav-pill nav-pill-blue">BETA</span></div>
       <div class="nav-label" style="margin-top:10px;">Account</div>
       <div class="nav-item" id="nav-settings"  data-page="settings">${ICONS.settings} Settings</div>
     </div>
@@ -495,6 +502,8 @@ function renderGenerate(prefillProgramId) {
               <span class="text-xs text-muted">Step 1 of 2</span>
             </div>
             <div class="card-body">
+              <!-- LIVE SYNC SECTION -->
+              <div class="live-sync-zone mb-16" id="live-sync-zone"></div>
               <div class="form-group">
                 <label class="form-label">Program <span class="required">*</span></label>
                 <select id="gen-program" onchange="onProgramSelect(this.value)">
@@ -588,7 +597,7 @@ function renderGenerate(prefillProgramId) {
             </div>
             <div class="output-actions" id="output-actions" style="${Object.keys(sg.outputs).length===0?'display:none':''}">
               <button class="btn btn-secondary btn-sm" onclick="doCopy()">${ICONS.copy} Copy</button>
-              <button class="btn btn-secondary btn-sm" onclick="toast('Slack integration coming soon!','info')">${ICONS.slack} Slack</button>
+              <button class="btn btn-secondary btn-sm" onclick="doSlackPublish()">${ICONS.slack} Post to Slack</button>
               <button class="btn btn-secondary btn-sm" onclick="toast('Email draft copied!','success')">${ICONS.email} Email draft</button>
               <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="doGenerate()">${ICONS.refresh} Regenerate</button>
             </div>
@@ -606,6 +615,7 @@ function renderGenerate(prefillProgramId) {
   // Initialize file upload UI
   initUploadZone();
   renderFileChips();
+  updateLiveSyncZone();
 }
 
 function renderPersonaCards() {
@@ -627,6 +637,92 @@ function renderPersonaCards() {
     </div>`;
   }).join('');
 }
+
+function updateLiveSyncZone() {
+  const zone = document.getElementById('live-sync-zone');
+  if (!zone) return;
+  
+  const ints = getIntegrations();
+  const jiraConnected = ints.jira.connected;
+  const githubConnected = ints.github.connected;
+  
+  if (!jiraConnected && !githubConnected) {
+    zone.innerHTML = `
+      <div style="background:var(--surface-dim);border:1px dashed var(--border);border-radius:8px;padding:12px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">
+          ⚖️ Connect Jira/GitHub in Integrations to pull live signals
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="showAppPage('integrations')">Setup →</button>
+      </div>
+    `;
+    return;
+  }
+  
+  zone.innerHTML = `
+    <div style="background:var(--accent-glow);border:1px solid rgba(45,125,210,0.2);border-radius:8px;padding:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:600;color:var(--accent-light);display:flex;align-items:center;gap:6px;">
+          ${ICONS.history} Live Source Available
+        </div>
+        <div class="flex gap-4">
+          ${jiraConnected ? `<button class="btn btn-primary btn-xs" id="btn-sync-jira" onclick="doSyncLive('jira')">${ICONS.jira} Jira</button>` : ''}
+          ${githubConnected ? `<button class="btn btn-primary btn-xs" id="btn-sync-github" onclick="doSyncLive('github')">${ICONS.github} GitHub</button>` : ''}
+        </div>
+      </div>
+      <div id="sync-status" style="font-size:11px;color:var(--text-muted);">Sync blockers or commit trends directly into your fields.</div>
+    </div>
+  `;
+}
+
+window.doSyncLive = async function(type) {
+  const btn = document.getElementById(`btn-sync-${type}`);
+  const statusLine = document.getElementById('sync-status');
+  const blockersArea = document.getElementById('gen-blockers');
+  
+  setButtonLoading(btn, true);
+  statusLine.innerHTML = `<div class="pulse-row"><div class="pulse-dot"></div><span>Contacting ${type} API...</span></div>`;
+  
+  try {
+    const data = type === 'jira' ? await syncJiraData() : await syncGitHubData();
+    setButtonLoading(btn, false);
+    
+    if (data) {
+      if (type === 'jira') {
+        const text = `LIVE JIRA DATA:\n${data.blockers.map(b => `- ${b.id}: ${b.summary} [${b.priority}]`).join('\n')}\nVelocity: ${data.velocity}`;
+        blockersArea.value = (blockersArea.value ? blockersArea.value + '\n\n' : '') + text;
+      } else {
+        const text = `LIVE GITHUB DATA:\n- Pull Requests: ${data.pullRequests}\n- Latest: ${data.lastCommit}\n- Sentiment: ${data.trends}`;
+        blockersArea.value = (blockersArea.value ? blockersArea.value + '\n\n' : '') + text;
+      }
+      statusLine.innerText = `Successfully pulled ${type} data.`;
+      toast(`${type} data synced`, 'success');
+    }
+  } catch (e) {
+    setButtonLoading(btn, false);
+    statusLine.innerText = `Error connecting to ${type}.`;
+    toast(`Sync failed`, 'error');
+  }
+};
+
+window.doSlackPublish = async function() {
+  const sg = state.generate;
+  const persona = sg.activeTab;
+  const content = sg.outputs[persona];
+  
+  if (!content) return toast('First generate an update', 'error');
+  
+  try {
+    setButtonLoading(document.activeElement, true);
+    const success = await publishToSlack(content);
+    setButtonLoading(document.activeElement, false);
+    if (success) {
+      toast('Update posted to Slack!', 'success');
+    }
+  } catch (e) {
+    setButtonLoading(document.activeElement, false);
+    toast(e.message, 'error');
+  }
+};
 
 function renderOutputContent() {
   const sg = state.generate;
@@ -1181,14 +1277,50 @@ function renderPortfolioTimeline(container) {
 function renderDependencyMapper(container) {
   const programs = getPrograms();
   const links = [];
+  
+  // Custom Mermaid Initialization for World Class Visuals
+  if (window.mermaid) {
+    window.mermaid.initialize({
+      theme: 'base',
+      startOnLoad: false,
+      securityLevel: 'loose',
+      flowchart: { 
+        htmlLabels: true, 
+        curve: 'basis',
+        useMaxWidth: true,
+        padding: 20
+      },
+      themeVariables: {
+        darkMode: true,
+        primaryColor: '#1a1f26',
+        primaryTextColor: '#f8f9fa',
+        primaryBorderColor: '#2d3748',
+        lineColor: '#718096',
+        secondaryColor: '#2d3748',
+        tertiaryColor: '#1a202c',
+        fontFamily: 'Outfit, sans-serif',
+        fontSize: '13px'
+      },
+      themeCSS: `
+        .node rect { stroke-width: 1.5px !important; rx: 10; ry: 10; }
+        .node.green rect { fill: rgba(45, 106, 79, 0.9) !important; stroke: #52B788 !important; filter: drop-shadow(0 0 6px rgba(82, 183, 136, 0.3)); }
+        .node.amber rect { fill: rgba(181, 101, 29, 0.9) !important; stroke: #FFB347 !important; filter: drop-shadow(0 0 6px rgba(255, 179, 71, 0.3)); }
+        .node.red rect   { fill: rgba(123, 36, 28, 0.9) !important; stroke: #C0392B !important; filter: drop-shadow(0 0 6px rgba(192, 57, 43, 0.3)); }
+        .edgePath .path { stroke-width: 2px !important; stroke: #4a5568 !important; }
+        .marker { fill: #4a5568 !important; }
+        .label { color: #f8f9fa !important; font-weight: 500; }
+      `
+    });
+  }
+
   programs.forEach(p => {
     if (p.dependencies && p.dependencies.length > 0) {
       p.dependencies.forEach(depId => {
         const dep = getProgramById(depId);
         if (dep) {
-          // Aggressive cleaning for Mermaid - strictly alphanumeric
-          const cleanDep = dep.name.replace(/[^a-zA-Z0-9 ]/g, " ").trim().slice(0, 25);
-          const cleanP = p.name.replace(/[^a-zA-Z0-9 ]/g, " ").trim().slice(0, 25);
+          // No truncation, using full names (Mermaid handles wrapping in flowchart)
+          const cleanDep = dep.name.replace(/[^a-zA-Z0-9 ]/g, " ").trim();
+          const cleanP = p.name.replace(/[^a-zA-Z0-9 ]/g, " ").trim();
           links.push(`${dep.id}["${cleanDep}"] --> ${p.id}["${cleanP}"]`);
         }
       });
@@ -1201,16 +1333,10 @@ function renderDependencyMapper(container) {
   }
 
   container.innerHTML = `
-    <div class="card">
+    <div class="card p-24" style="background: #0D1117;">
       <div class="mermaid" id="mermaid-graph">
-        graph TD
+        flowchart TD
         ${links.join('\n')}
-        
-        %% Styles
-        classDef green fill:#D2F4E1,stroke:#52B788,stroke-width:1px,color:#0D1B2A;
-        classDef amber fill:#FFE8CC,stroke:#FFB347,stroke-width:1px,color:#0D1B2A;
-        classDef red fill:#FDE2E2,stroke:#C0392B,stroke-width:1px,color:#0D1B2A;
-        
         ${programs.map(p => `class ${p.id} ${p.rag}`).join('\n')}
       </div>
     </div>
@@ -1224,8 +1350,6 @@ function renderDependencyMapper(container) {
         });
       } catch (e) {
         console.error("Mermaid run failed", e);
-        // Fallback to legacy init if run fails
-        window.mermaid.init(undefined, container.querySelectorAll('.mermaid'));
       }
     }, 50);
   }
@@ -1770,4 +1894,184 @@ window.doSignOut = async function() {
     await signOut();
     toast('Signed out successfully', 'info');
   });
+};
+
+// ── INTEGRATIONS ──────────────────────────────────────────────────
+function renderIntegrationsPage() {
+  const ints = getIntegrations();
+  const el = document.getElementById('apppage-integrations');
+  
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-title">Integration <em>Ecosystem</em></div>
+        <div class="page-subtitle">Pull live data from your source-of-truth tools to automate status intelligence.</div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="int-grid">
+        <!-- JIRA -->
+        <div class="int-card int-jira">
+          <div class="int-header">
+            <div class="int-icon-box">${ICONS.jira}</div>
+            <div class="int-badge ${ints.jira.connected ? 'int-badge-connected' : 'int-badge-disconnected'}">
+              ${ints.jira.connected ? 'Connected' : 'Disconnected'}
+            </div>
+          </div>
+          <div>
+            <div class="int-title">Jira Cloud</div>
+            <div class="int-desc">Sync active blockers, sprint velocity, and ticket trends directly into reports.</div>
+          </div>
+          <div class="int-meta">
+            ${ints.jira.connected ? `Linked to ${ints.jira.domain}` : 'No active connection'}
+          </div>
+          <button class="btn ${ints.jira.connected ? 'btn-ghost' : 'btn-primary'}" onclick="showIntegrationModal('jira')">
+            ${ints.jira.connected ? 'Configure' : 'Connect Jira'}
+          </button>
+        </div>
+
+        <!-- GITHUB -->
+        <div class="int-card int-github">
+          <div class="int-header">
+            <div class="int-icon-box">${ICONS.github}</div>
+            <div class="int-badge ${ints.github.connected ? 'int-badge-connected' : 'int-badge-disconnected'}">
+              ${ints.github.connected ? 'Connected' : 'Disconnected'}
+            </div>
+          </div>
+          <div>
+            <div class="int-title">GitHub</div>
+            <div class="int-desc">Track PR volume, commit frequency, and release cycles across repositories.</div>
+          </div>
+          <div class="int-meta">
+             ${ints.github.connected ? `Syncing ${ints.github.repo}` : 'No active connection'}
+          </div>
+          <button class="btn ${ints.github.connected ? 'btn-ghost' : 'btn-primary'}" onclick="showIntegrationModal('github')">
+            ${ints.github.connected ? 'Configure' : 'Connect GitHub'}
+          </button>
+        </div>
+
+        <!-- SLACK -->
+        <div class="int-card int-slack">
+          <div class="int-header">
+            <div class="int-icon-box">${ICONS.slack}</div>
+            <div class="int-badge ${ints.slack.connected ? 'int-badge-connected' : 'int-badge-disconnected'}">
+              ${ints.slack.connected ? 'Connected' : 'Disconnected'}
+            </div>
+          </div>
+          <div>
+            <div class="int-title">Slack</div>
+            <div class="int-desc">One-click publishing for generated status updates to specific project channels.</div>
+          </div>
+          <div class="int-meta">
+            ${ints.slack.connected ? 'Webhook active' : 'No active connection'}
+          </div>
+          <button class="btn ${ints.slack.connected ? 'btn-ghost' : 'btn-primary'}" onclick="showIntegrationModal('slack')">
+            ${ints.slack.connected ? 'Configure' : 'Connect Slack'}
+          </button>
+        </div>
+
+        <!-- GOOGLE CALENDAR -->
+        <div class="int-card int-google">
+          <div class="int-header">
+            <div class="int-icon-box">${ICONS.calendar}</div>
+            <div class="int-badge ${ints.google.connected ? 'int-badge-connected' : 'int-badge-disconnected'}">
+              ${ints.google.connected ? 'Connected' : 'Disconnected'}
+            </div>
+          </div>
+          <div>
+            <div class="int-title">Google Calendar</div>
+            <div class="int-desc">Sync team OOO blocks and upcoming milestones into your Risk Radar.</div>
+          </div>
+          <div class="int-meta">
+            ${ints.google.connected ? 'Syncing active' : 'No active connection'}
+          </div>
+          <button class="btn ${ints.google.connected ? 'btn-ghost' : 'btn-primary'}" onclick="showIntegrationModal('google')">
+            ${ints.google.connected ? 'Configure' : 'Connect Google'}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.showIntegrationModal = function(type) {
+  const ints = getIntegrations();
+  const config = ints[type];
+  
+  let modalHtml = '';
+  if (type === 'jira') {
+    modalHtml = `
+      <div class="form-group">
+        <label class="form-label">Atlassian Domain</label>
+        <input type="text" id="int-domain" placeholder="your-company.atlassian.net" value="${config.domain || ''}">
+      </div>
+      <div class="form-group mt-12">
+        <label class="form-label">API Token (PAT)</label>
+        <input type="password" id="int-token" placeholder="Paste your token..." value="${config.token || ''}">
+      </div>
+      <div class="form-group mt-12">
+        <label class="form-label">Default Project Key</label>
+        <input type="text" id="int-project" placeholder="PROJ" value="${config.project || ''}">
+      </div>
+    `;
+  } else if (type === 'github') {
+    modalHtml = `
+      <div class="form-group">
+        <label class="form-label">Personal Access Token</label>
+        <input type="password" id="int-token" placeholder="ghp_..." value="${config.token || ''}">
+      </div>
+      <div class="form-group mt-12">
+        <label class="form-label">Target Repository</label>
+        <input type="text" id="int-repo" placeholder="owner/repo" value="${config.repo || ''}">
+      </div>
+    `;
+  } else if (type === 'slack') {
+    modalHtml = `
+      <div class="form-group">
+        <label class="form-label">Incoming Webhook URL</label>
+        <input type="text" id="int-webhook" placeholder="https://hooks.slack.com/services/..." value="${config.webhook || ''}">
+      </div>
+    `;
+  } else if (type === 'google') {
+    modalHtml = `
+      <div class="modal-note mb-16">Google Calendar integration uses OAuth. Click below to authorize Unblocked AI to read your calendar.</div>
+    `;
+  }
+
+  const { el, close } = openModal(`
+    <div class="modal-title">Configure ${type.charAt(0).toUpperCase() + type.slice(1)}</div>
+    <div class="modal-sub">Your credentials are stored securely in your local browser storage.</div>
+    ${modalHtml}
+    <div class="flex gap-12 mt-24">
+      <button class="btn btn-primary flex-1" id="save-int">Save Connection</button>
+      ${config.connected ? `<button class="btn btn-ghost" id="disconnect-int" style="color:var(--danger)">Disconnect</button>` : ''}
+    </div>
+  `);
+
+  el.querySelector('#save-int').onclick = () => {
+    const data = { connected: true };
+    if (type === 'jira') {
+      data.domain = el.querySelector('#int-domain').value.trim();
+      data.token = el.querySelector('#int-token').value.trim();
+      data.project = el.querySelector('#int-project').value.trim();
+    } else if (type === 'github') {
+      data.token = el.querySelector('#int-token').value.trim();
+      data.repo = el.querySelector('#int-repo').value.trim();
+    } else if (type === 'slack') {
+      data.webhook = el.querySelector('#int-webhook').value.trim();
+    }
+    saveIntegration(type, data);
+    close();
+    renderIntegrationsPage();
+    toast(`${type.charAt(0).toUpperCase() + type.slice(1)} connected!`, 'success');
+  };
+
+  if (config.connected) {
+    el.querySelector('#disconnect-int').onclick = () => {
+      disconnectIntegration(type);
+      close();
+      renderIntegrationsPage();
+      toast(`${type.charAt(0).toUpperCase() + type.slice(1)} disconnected`, 'info');
+    };
+  }
 };
