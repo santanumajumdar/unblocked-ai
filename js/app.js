@@ -10,7 +10,7 @@ import {
 } from './programs.js';
 
 import {
-  generateStatusUpdate, getApiKey, setApiKey, clearApiKey, hasApiKey,
+  generateStatusUpdate, extractProgramSignals, getApiKey, setApiKey, clearApiKey, hasApiKey,
   getProvider, setProvider
 } from './api.js';
 
@@ -914,6 +914,19 @@ function showProgramModal(program) {
   const isEdit = !!program;
   const { el, close } = openModal(`
     <div style="font-size:17px;font-weight:500;margin-bottom:18px;">${isEdit ? 'Edit program' : 'Add new program'}</div>
+    
+    ${!isEdit ? `
+    <div class="upload-zone mb-16" id="pf-upload-zone" style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;">
+      <div style="font-size:20px;margin-bottom:4px;">📄</div>
+      <div style="font-size:13.5px;font-weight:500;">Auto-populate from document</div>
+      <div style="font-size:11.5px;color:var(--text-muted);">Drop project report, plan, or spec here</div>
+      <input type="file" id="pf-file-input" style="display:none">
+    </div>
+    <div id="pf-parsing-indicator" class="mb-16" style="display:none;">
+      <div class="pulse-row"><div class="pulse-dot"></div><span style="font-size:12px;">AI is extracting program signals...</span></div>
+    </div>
+    ` : ''}
+
     <div class="form-group">
       <label class="form-label">Program name <span class="required">*</span></label>
       <input type="text" id="pf-name" placeholder="e.g. Orion — Cloud Cost Optimization" value="${program?.name || ''}">
@@ -957,6 +970,65 @@ function showProgramModal(program) {
     </div>
   `);
 
+  if (!isEdit) {
+    const zone = el.querySelector('#pf-upload-zone');
+    const input = el.querySelector('#pf-file-input');
+    const indicator = el.querySelector('#pf-parsing-indicator');
+
+    zone.onclick = () => input.click();
+    input.onchange = (e) => handlePfUpload(e.target.files);
+    
+    zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; zone.style.background = 'var(--accent-glow)'; };
+    zone.ondragleave = () => { zone.style.borderColor = 'var(--border)'; zone.style.background = 'none'; };
+    zone.ondrop = (e) => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--border)';
+      zone.style.background = 'none';
+      handlePfUpload(e.dataTransfer.files);
+    };
+
+    const handlePfUpload = async (files) => {
+      if (!files.length) return;
+      indicator.style.display = 'block';
+      let fullText = '';
+      try {
+        for (const file of files) {
+          const text = await parseFile(file);
+          fullText += text + '\n\n';
+        }
+        
+        extractProgramSignals(fullText, (data) => {
+          indicator.style.display = 'none';
+          const programs = data.programs || (data.name ? [data] : []);
+          
+          if (programs.length > 1) {
+            renderBulkReview(programs, el, close);
+            return;
+          }
+          
+          if (programs.length === 1) {
+            const p = programs[0];
+            if (p.name) el.querySelector('#pf-name').value = p.name;
+            if (p.team) el.querySelector('#pf-team').value = p.team;
+            if (p.quarter) el.querySelector('#pf-quarter').value = p.quarter;
+            if (p.rag) el.querySelector('#pf-rag').value = p.rag;
+            if (p.milestone) el.querySelector('#pf-milestone').value = p.milestone;
+            if (p.blockers) el.querySelector('#pf-blockers').value = p.blockers;
+            toast('Signals extracted from document!', 'success');
+          } else {
+            toast('No programs found in document', 'info');
+          }
+        }, (err) => {
+          indicator.style.display = 'none';
+          toast(err, 'error');
+        });
+      } catch (err) {
+        indicator.style.display = 'none';
+        toast('Document parsing failed', 'error');
+      }
+    };
+  }
+
   el.querySelector('#pf-save').onclick = () => {
     const name = el.querySelector('#pf-name').value.trim();
     if (!name) { toast('Program name is required', 'error'); return; }
@@ -986,6 +1058,64 @@ function showProgramModal(program) {
     }
   };
 }
+
+function renderBulkReview(programs, modalEl, close) {
+  modalEl.innerHTML = `
+    <div style="font-size:17px;font-weight:500;margin-bottom:8px;">Bulk Program Import</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:18px;">AI detected ${programs.length} programs. Review and import them.</div>
+    
+    <div class="bulk-import-container">
+      ${programs.map((p, i) => `
+        <div class="bulk-program-item" id="bulk-item-${i}">
+          <div class="bulk-info">
+            <div class="bulk-name">${p.name || 'Untitled Program'}</div>
+            <div class="bulk-meta">${p.team || 'General'} &middot; ${p.quarter || 'Q2 2026'} &middot; ${ragLabel(p.rag)}</div>
+          </div>
+          <div class="bulk-actions">
+            <button class="btn btn-ghost btn-sm text-danger" onclick="this.closest('.bulk-program-item').remove()">Skip</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="flex gap-8 mt-24">
+      <button class="btn btn-ghost" style="flex:1;" onclick="location.reload()">Cancel</button>
+      <button class="btn btn-primary" style="flex:2;" id="bulk-save-all">Import All Programs</button>
+    </div>
+  `;
+
+  modalEl.querySelector('#bulk-save-all').onclick = () => {
+    const items = modalEl.querySelectorAll('.bulk-program-item');
+    const toSave = Array.from(items).map(item => {
+      const idx = parseInt(item.id.split('-').pop());
+      return programs[idx];
+    });
+
+    toSave.forEach(p => {
+      // Find existing by name for basic de-duplication
+      const existing = getPrograms().find(ep => ep.name.toLowerCase() === p.name.toLowerCase());
+      const programToSave = {
+        id:          existing?.id || newProgramId(),
+        name:        p.name,
+        team:        p.team || 'General',
+        quarter:     p.quarter || 'Q2 2026',
+        rag:         p.rag || 'green',
+        milestone:   p.milestone || '',
+        blockers:    p.blockers || '',
+        decisions:   existing?.decisions || '',
+        milestones:  existing?.milestones || '',
+        emoji:       '📁',
+        lastUpdated: Date.now()
+      };
+      saveProgram(programToSave);
+    });
+
+    close();
+    toast(`Successfully imported ${toSave.length} programs!`, 'success');
+    renderPrograms();
+  };
+}
+
 
 window.confirmDeleteProgram = function(id) {
   const p = getProgramById(id);

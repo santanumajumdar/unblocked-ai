@@ -548,6 +548,16 @@ select {
 .progress-amber { background: var(--warn); }
 .progress-blue  { background: var(--accent); }
 
+/* ── BULK IMPORT UI ────────────────────────────────────── */
+.bulk-import-container { margin-top: 14px; max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-dim); }
+.bulk-program-item { padding: 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: background 0.2s; }
+.bulk-program-item:last-child { border-bottom: none; }
+.bulk-program-item:hover { background: var(--surface-light); }
+.bulk-info { flex: 1; overflow: hidden; }
+.bulk-name { font-size: 13.5px; font-weight: 500; color: var(--text-primary); }
+.bulk-meta { font-size: 11.5px; color: var(--text-muted); }
+.bulk-actions { display: flex; gap: 6px; }
+
 /* ── DIVIDER ────────────────────────────────────────────── */
 .divider { height: 1px; background: var(--border); margin: 22px 0; }
 

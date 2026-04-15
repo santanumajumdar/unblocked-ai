@@ -79,6 +79,104 @@ export async function generateStatusUpdate(programData, persona, targetEl, onDon
   }
 }
 
+/**
+ * extractProgramSignals — Extracts program data from raw text
+ * @param {string} text - Raw content from parsed documents
+ * @param {function} onDone - Callback(programObject)
+ * @param {function} onError - Callback(errString)
+ */
+export async function extractProgramSignals(text, onDone, onError) {
+  const provider = getProvider();
+  const apiKey = getApiKey(provider);
+
+  if (!apiKey) {
+    onError(`No ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} API key set.`);
+    return;
+  }
+
+  // --- MOCK MODE ---
+  if (apiKey === MOCK_KEY) {
+    onDone({
+      programs: [
+        {
+          name: "Project Orion (Extracted)",
+          team: "Platform Engineering",
+          quarter: "Q3 2026",
+          rag: "amber",
+          milestone: "July 12",
+          blockers: "High-latency signals on the primary ingress. Need resource scaling."
+        },
+        {
+          name: "Project Meridian (Extracted)",
+          team: "Data & Analytics",
+          quarter: "Q3 2026",
+          rag: "green",
+          milestone: "August 5",
+          blockers: "No critical blockers."
+        }
+      ]
+    });
+    return;
+  }
+
+  const systemPrompt = `You are a Senior TPM. Extract program information from the provided text and return it as a JSON object.
+If the text describes multiple projects or programs, extract ALL of them.
+
+Return the data in this exact format:
+{
+  "programs": [
+    {
+      "name": "Project Name",
+      "team": "Team Name",
+      "quarter": "Q3 2026",
+      "rag": "green|amber|red",
+      "milestone": "Date",
+      "blockers": "Text"
+    }
+  ]
+}
+
+Return ONLY valid JSON. If a field is missing, use an empty string. If no programs are found, return an empty array for "programs".`;
+
+  try {
+    if (provider === 'gemini') {
+      const resp = await fetch(`${API_URLS.gemini}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `TEXT CONTENT:\n${text}\n\nReturn JSON only.` }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+      const data = await resp.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      onDone(JSON.parse(rawText));
+    } else {
+      const resp = await fetch(API_URLS.anthropic, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: MODELS.anthropic,
+          max_tokens: 500,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: `PARSED CONTENT:\n${text}` }]
+        })
+      });
+      const data = await resp.json();
+      const rawText = data.content?.[0]?.text || '{}';
+      onDone(JSON.parse(rawText));
+    }
+  } catch (err) {
+    onError(err.message || 'Extraction failed');
+  }
+}
+
 async function generateAnthropic(programData, persona, targetEl, onDone, onError) {
   const apiKey = getApiKey('anthropic');
   const personaConfig = PERSONA_PROMPTS[persona];
