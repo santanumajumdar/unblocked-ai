@@ -99,6 +99,8 @@ Write the update now.`;
   targetEl.innerHTML = `<div class="pulse-row"><div class="pulse-dot"></div><div class="pulse-dot"></div><div class="pulse-dot"></div><span style="margin-left:8px;">Generating ${personaConfig.label} update…</span></div>`;
 
   try {
+    const combinedSystem = `${personaConfig.system}${programData.fileContext ? '\n\nAdditional Ground Truth Context from project documents:\n' + programData.fileContext : ''}`;
+    
     const response = await fetch(API_URLS.anthropic, {
       method: 'POST',
       headers: {
@@ -109,9 +111,9 @@ Write the update now.`;
       },
       body: JSON.stringify({
         model: MODELS.anthropic,
-        max_tokens: 800,
+        max_tokens: 1000,
         stream: true,
-        system: personaConfig.system,
+        system: combinedSystem,
         messages: [{ role: 'user', content: userPrompt }]
       })
     });
@@ -172,14 +174,20 @@ Write the update now.`;
   targetEl.innerHTML = `<div class="pulse-row"><div class="pulse-dot"></div><div class="pulse-dot"></div><div class="pulse-dot"></div><span style="margin-left:8px;">Generating ${personaConfig.label} update (Gemini)…</span></div>`;
 
   try {
-    const url = `${API_URLS.gemini}/${MODELS.gemini}:streamGenerateContent?alt=sse&key=${apiKey}`;
-    const response = await fetch(url, {
+    const combinedSystem = `${personaConfig.system}${programData.fileContext ? '\n\nAdditional Ground Truth Context from project documents:\n' + programData.fileContext : ''}`;
+    
+    const response = await fetch(`${API_URLS.gemini}?key=${apiKey}&alt=sse`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: { maxOutputTokens: 1000, temperature: 0.7 }
+        contents: [{
+          role: 'user',
+          parts: [{ text: `${combinedSystem}\n\nUSER PROMPT:\n${userPrompt}` }]
+        }],
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature: 0.7
+        }
       })
     });
 

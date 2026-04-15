@@ -15,6 +15,13 @@ import {
 } from './api.js';
 
 import {
+  signInWithGoogle, signInWithGitHub, signOut, getUser,
+  onAuthStateChange, isAuthEnabled, getSupabaseConfig, setSupabaseConfig
+} from './auth.js';
+
+import { parseFile } from './parser.js';
+
+import {
   toast, openModal, confirm as uiConfirm, copyText,
   formatDate, daysAgo, ragBadge, ragEmoji, ragLabel,
   personaBadge, severityBadge, truncate, getTimeGreeting,
@@ -99,7 +106,6 @@ window.enterApp = function(targetPage = 'dashboard') {
 
 function showApiKeyModal(onSuccess) {
   let activeTab = 'anthropic';
-
   const { el, close } = openModal(`
     <div class="modal-logo">
       <div class="logo-mark">U</div>
@@ -107,25 +113,19 @@ function showApiKeyModal(onSuccess) {
     </div>
     <div class="modal-title">Select your AI provider</div>
     <div class="modal-sub">Choose a free or premium provider to power your status intelligence.</div>
-
     <div class="provider-tabs">
       <div class="p-tab active" data-p="anthropic">Claude (Anthropic)</div>
       <div class="p-tab" data-p="gemini">Gemini (Google)</div>
     </div>
-
     <div class="form-group mt-16">
       <label class="form-label" id="key-label">Anthropic API key <span class="required">*</span></label>
       <input type="password" id="modal-api-key" placeholder="sk-ant-…" autocomplete="off">
     </div>
-
     <div id="provider-note" class="modal-note mb-16" style="margin-top:-8px; font-style:italic;">
       Claude 3.5 Sonnet requires a paid key from Anthropic.
     </div>
-
     <button class="btn btn-primary btn-block" id="modal-save-key">Save key and activate</button>
-
     <div class="modal-divider-text"><span>OR</span></div>
-
     <button class="btn btn-ghost btn-block" id="modal-demo-mode" style="border-color:var(--blue-dim); color:var(--blue-light);">
       Try Demo Mode — No key required
     </button>
@@ -136,7 +136,6 @@ function showApiKeyModal(onSuccess) {
   const note  = el.querySelector('#provider-note');
   const tabs  = el.querySelectorAll('.p-tab');
   const saveBtn = el.querySelector('#modal-save-key');
-  const demoBtn = el.querySelector('#modal-demo-mode');
 
   tabs.forEach(tab => {
     tab.onclick = () => {
@@ -161,13 +160,6 @@ function showApiKeyModal(onSuccess) {
   saveBtn.addEventListener('click', () => {
     const key = input.value.trim();
     if (!key) { toast('Please enter a key', 'error'); return; }
-    if (activeTab === 'anthropic' && !key.startsWith('sk-ant')) {
-      toast('Invalid Claude key — should start with sk-ant', 'error'); return;
-    }
-    if (activeTab === 'gemini' && !key.startsWith('AIza')) {
-      toast('Invalid Gemini key — usually starts with AIza', 'error'); return;
-    }
-
     setProvider(activeTab);
     setApiKey(key, activeTab);
     close();
@@ -175,13 +167,74 @@ function showApiKeyModal(onSuccess) {
     if (onSuccess) onSuccess();
   });
 
-  demoBtn.addEventListener('click', () => {
+  el.querySelector('#modal-demo-mode').onclick = () => {
     setProvider('anthropic');
     setApiKey('sk-demo-mode', 'anthropic');
     close();
     toast('Demo Mode activated!', 'info');
     if (onSuccess) onSuccess();
-  });
+  };
+}
+
+function showLoginModal() {
+  const { el, close } = openModal(`
+    <div class="modal-logo">
+      <div class="logo-mark">U</div>
+      <div class="logo-wordmark">Un<span>blocked</span> AI</div>
+    </div>
+    <div class="modal-title">Sign in to Unblocked AI</div>
+    <div class="modal-sub">Personalize your TPM dashboard and sync your program data across devices.</div>
+    <div class="flex flex-col gap-12 mt-16">
+      <button class="btn btn-secondary btn-block flex items-center justify-center gap-8" id="login-google" ${!isAuthEnabled()?'disabled':''}>
+        <svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285f4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34a853"/><path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#fbbc05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962l3.007 2.332C4.672 5.164 6.656 3.58 9 3.58z" fill="#ea4335"/></svg>
+        Sign in with Google
+      </button>
+      <button class="btn btn-secondary btn-block flex items-center justify-center gap-8" id="login-github" ${!isAuthEnabled()?'disabled':''}>
+        <svg width="18" height="18" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" fill="currentColor"/></svg>
+        Sign in with GitHub
+      </button>
+    </div>
+    <div class="modal-divider-text"><span>OR</span></div>
+    <div class="modal-note text-center">
+      You can also continue as a guest. All data stays in your browser.
+      <br><br>
+      <a href="#" id="modal-guest" style="color:var(--blue-light); text-decoration:none; font-weight:500;">Continue as Guest</a>
+    </div>
+    ${!isAuthEnabled() ? `
+      <div class="alert alert-info mt-16" style="font-size:12px;">
+        <strong>Note:</strong> OAuth requires Supabase configuration in Settings.
+      </div>
+    ` : ''}
+  `);
+
+  if (isAuthEnabled()) {
+    el.querySelector('#login-google').onclick = async () => { try { await signInWithGoogle(); } catch (e) { toast(e.message, 'error'); } };
+    el.querySelector('#login-github').onclick = async () => { try { await signInWithGitHub(); } catch (e) { toast(e.message, 'error'); } };
+  }
+  el.querySelector('#modal-guest').onclick = (e) => { e.preventDefault(); close(); };
+}
+
+function showSupabaseConfigModal() {
+  const config = getSupabaseConfig();
+  const { el, close } = openModal(`
+    <div class="modal-title">Connect Supabase</div>
+    <div class="modal-sub">Provide your Supabase Project URL and Anon Key to enable OAuth and cloud sync.</div>
+    <div class="form-group">
+      <label class="form-label">Supabase URL</label>
+      <input type="text" id="s-url" value="${config.url}" placeholder="https://xyz.supabase.co">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Supabase Anon Key</label>
+      <input type="password" id="s-key" value="${config.key}" placeholder="eyJhbGciOiJIUzI1NiI...">
+    </div>
+    <button class="btn btn-primary btn-block" id="save-s-config">Save and refresh</button>
+  `);
+  el.querySelector('#save-s-config').onclick = () => {
+    const url = el.querySelector('#s-url').value.trim();
+    const key = el.querySelector('#s-key').value.trim();
+    setSupabaseConfig(url, key);
+    close();
+  };
 }
 
 // ── RENDER APP SHELL ──────────────────────────────────────────────
@@ -482,6 +535,26 @@ function renderGenerate(prefillProgramId) {
               </button>
             </div>
           </div>
+
+          <!-- DOCUMENT UPLOAD ZONE -->
+          <div class="card-raised mt-14">
+            <div class="card-header">
+              <div class="card-title">Project documents (PDF, XLS, Word)</div>
+              <span class="text-xs text-muted">Optional Context</span>
+            </div>
+            <div class="card-body">
+              <div class="upload-zone" id="gen-upload-zone" style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:24px;text-align:center;cursor:pointer;transition:all 0.2s;">
+                <div style="font-size:24px;margin-bottom:8px;">📄</div>
+                <div style="font-size:13.5px;font-weight:500;">Drop project documents here</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">or click to upload</div>
+                <input type="file" id="gen-file-input" multiple style="display:none">
+              </div>
+              <div id="gen-file-list" class="flex flex-wrap gap-8 mt-12"></div>
+              <div id="gen-parsing-indicator" class="mt-8" style="display:none;">
+                <div class="pulse-row"><div class="pulse-dot"></div><span style="font-size:12px;">Extracting signals...</span></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- OUTPUT PANEL -->
@@ -513,9 +586,12 @@ function renderGenerate(prefillProgramId) {
 
   // Prefill RAG if program selected
   if (prefill) {
-    state.generate.selectedRag = prefill.rag || 'green';
     refreshRagUI();
   }
+
+  // Initialize file upload UI
+  initUploadZone();
+  renderFileChips();
 }
 
 function renderPersonaCards() {
@@ -570,7 +646,8 @@ window.doGenerate = async function() {
     blockers:   document.getElementById('gen-blockers')?.value || '',
     decisions:  document.getElementById('gen-decisions')?.value || '',
     milestones: document.getElementById('gen-milestones')?.value || '',
-    tone:       document.getElementById('gen-tone')?.value || 'balanced'
+    tone:       document.getElementById('gen-tone')?.value || 'balanced',
+    fileContext: (window.genFiles || []).map(f => `--- FILE: ${f.name} ---\n${f.content}`).join('\n\n')
   };
 
   sg.generating = true;
@@ -718,6 +795,58 @@ window.goToGenerate = function(programId) {
     const sel = document.getElementById('gen-program');
     if (sel) { sel.value = programId; onProgramSelect(programId); }
   }, 100);
+};
+
+// ── FILE HANDLING ────────────────────────────────────────────────
+window.genFiles = [];
+
+function initUploadZone() {
+  const zone = document.getElementById('gen-upload-zone');
+  const input = document.getElementById('gen-file-input');
+  if (!zone || !input) return;
+
+  zone.onclick = () => input.click();
+  zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--blue-light)'; zone.style.background = 'var(--surface-light)'; };
+  zone.ondragleave = () => { zone.style.borderColor = 'var(--border)'; zone.style.background = 'none'; };
+  zone.ondrop = (e) => {
+    e.preventDefault();
+    zone.style.borderColor = 'var(--border)';
+    zone.style.background = 'none';
+    handleGenFiles(e.dataTransfer.files);
+  };
+  input.onchange = (e) => handleGenFiles(e.target.files);
+}
+
+async function handleGenFiles(files) {
+  const indicator = document.getElementById('gen-parsing-indicator');
+  if (indicator) indicator.style.display = 'block';
+  
+  for (const file of files) {
+    try {
+      const text = await parseFile(file);
+      window.genFiles.push({ name: file.name, content: text });
+      renderFileChips();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+  if (indicator) indicator.style.display = 'none';
+}
+
+function renderFileChips() {
+  const list = document.getElementById('gen-file-list');
+  if (!list) return;
+  list.innerHTML = window.genFiles.map((f, i) => `
+    <div class="file-chip" style="background:var(--surface-light);border:1px solid var(--border);border-radius:12px;padding:4px 10px;display:flex;align-items:center;gap:6px;font-size:12px;">
+      <span class="truncate" style="max-width:140px;">${f.name}</span>
+      <button onclick="window.removeGenFile(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 2px;">&times;</button>
+    </div>
+  `).join('');
+}
+
+window.removeGenFile = (idx) => {
+  window.genFiles.splice(idx, 1);
+  renderFileChips();
 };
 
 // ── PROGRAMS ──────────────────────────────────────────────────────
@@ -1110,18 +1239,34 @@ function renderSettings() {
         </div>
       </div>
 
-      <div class="setting-row" style="border:none;padding-top:0;">
-        <div class="setting-info">
-          <div class="setting-name text-danger">Reset all data</div>
-          <div class="setting-desc">Clear all programs, history, and settings from your browser</div>
+      <div class="settings-section">
+        <div class="settings-title">Integrations & Cloud</div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name">Supabase Connection</div>
+            <div class="setting-desc">${isAuthEnabled() ? '✓ Connected to your Supabase project' : 'Configure Supabase to enable OAuth and cloud data sync'}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="window.openSupabaseConfig()">
+            ${isAuthEnabled() ? 'Update Config' : 'Configure'}
+          </button>
         </div>
-        <button class="btn btn-danger btn-sm" onclick="confirmResetAll()">Reset all</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Account Actions</div>
+        <div class="setting-row" style="border:none;padding-top:0;">
+          <div class="setting-info">
+            <div class="setting-name text-danger">Reset all local data</div>
+            <div class="setting-desc">Clear all projects, history, and settings from this browser</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="confirmResetAll()">Reset all</button>
+        </div>
       </div>
 
       <div class="free-badge mt-16">
-        <div style="font-size:13px;font-weight:500;color:var(--blue-light);margin-bottom:3px;">Unblocked AI is free, forever.</div>
-        <div style="font-size:12.5px;color:var(--text-muted);">No credit card. No trials. No paywalls. Built by a TPM, for TPMs.</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Built by Santanu Majumdar · <a href="https://topmate.io/santanumajumdar" target="_blank">Topmate coaching</a> · <a href="https://linkedin.com/in/santanumajumdar" target="_blank">Unblocked Newsletter</a></div>
+        <div style="font-size:13px;font-weight:500;color:var(--blue-light);margin-bottom:3px;">Unblocked AI &middot; Open Source</div>
+        <div style="font-size:12.5px;color:var(--text-muted);">No ads. No paywalls. Built by a TPM, for TPMs.</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Built by Santanu Majumdar &middot; <a href="https://topmate.io/santanumajumdar" target="_blank">Coaching</a> &middot; <a href="https://linkedin.com/in/santanumajumdar" target="_blank">LinkedIn</a></div>
       </div>
     </div>`;
 }
@@ -1192,3 +1337,56 @@ function getDisplayName() {
 window.showPage     = showPage;
 window.showAppPage  = showAppPage;
 window.toast        = toast;
+window.openLoginModal = showLoginModal;
+window.openApiKeyModal = showApiKeyModal;
+window.openSupabaseConfig = showSupabaseConfigModal;
+
+window.currentUser = null;
+
+// Track auth state
+onAuthStateChange((event, user) => {
+  window.currentUser = user;
+  updateAuthUI();
+  if (event === 'SIGNED_IN') {
+    toast(`Welcome back, ${user.user_metadata?.full_name || user.email}!`, 'success');
+  }
+});
+
+function updateAuthUI() {
+  const sidebarFooter = document.querySelector('.sidebar-footer');
+  const user = window.currentUser;
+  
+  if (user) {
+    const name = user.user_metadata?.full_name || user.email;
+    const avatar = user.user_metadata?.avatar_url;
+    const initials = name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+    
+    sidebarFooter.innerHTML = `
+      <div class="user-chip border-t pt-16">
+        <div class="avatar">${avatar ? `<img src="${avatar}" style="width:100%;height:100%;border-radius:50%">` : initials}</div>
+        <div class="flex-1 overflow-hidden">
+          <div class="user-name truncate">${name}</div>
+          <div class="user-role">Authenticated</div>
+        </div>
+        <button class="icon-btn-ghost ml-8" onclick="window.doSignOut()" title="Sign Out">
+          ${ICONS.logout || '⏻'}
+        </button>
+      </div>
+    `;
+  } else {
+    sidebarFooter.innerHTML = `
+      <div class="px-4 border-t pt-16">
+        <button class="btn btn-ghost btn-block flex items-center justify-center gap-8" onclick="window.openLoginModal()">
+          ${ICONS.user} Sign in
+        </button>
+      </div>
+    `;
+  }
+}
+
+window.doSignOut = async function() {
+  uiConfirm('Are you sure you want to sign out?', async () => {
+    await signOut();
+    toast('Signed out successfully', 'info');
+  });
+};
