@@ -2178,7 +2178,7 @@ function renderSettings() {
           </div>
         </div>
       </div>
-
+      
       <div class="settings-section">
         <div class="settings-title">AI preferences</div>
         <div class="setting-row">
@@ -2193,7 +2193,6 @@ function renderSettings() {
             <option value="urgent"   ${localStorage.getItem('unblocked_tone')==='urgent'  ?'selected':''}>Urgent</option>
           </select>
         </div>
-      </div>
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-name">Escalation threshold</div>

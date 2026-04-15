@@ -110,8 +110,10 @@ export function renderCoaching(el, showAppPage) {
           `).join('')}
         </div>
       `}
+      
+      <div style="height:64px;"></div>
 
-      <div class="card-raised mt-24" style="background:var(--blue-dim); border-color:var(--blue-light); border-left: 5px solid var(--blue-light);">
+      <div class="card-raised" style="background:var(--blue-dim); border-color:var(--blue-light); border-left: 5px solid var(--blue-light);">
         <div class="flex items-center gap-14">
           <div style="font-size:32px;">🧠</div>
           <div>
