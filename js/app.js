@@ -1204,14 +1204,17 @@ function renderVisuals() {
         </button>
       </div>
     </div>
-    
-    <div class="visuals-tabs mb-24">
-      <div class="v-tab ${activeVisualTab === 'timeline' ? 'active' : ''}" onclick="switchVisualTab('timeline')">Timeline (Gantt)</div>
-      <div class="v-tab ${activeVisualTab === 'mapper' ? 'active' : ''}" onclick="switchVisualTab('mapper')">Dependency Mapper</div>
-      <div class="v-tab ${activeVisualTab === 'mbr' ? 'active' : ''}" onclick="switchVisualTab('mbr')">MBR Report</div>
+    <div class="page-body">
+      <div class="flex justify-start mb-24">
+        <div class="v-tabs">
+          <div class="v-tab ${activeVisualTab === 'timeline' ? 'active' : ''}" onclick="switchVisualTab('timeline')">Timeline (Gantt)</div>
+          <div class="v-tab ${activeVisualTab === 'mapper' ? 'active' : ''}" onclick="switchVisualTab('mapper')">Dependency Mapper</div>
+          <div class="v-tab ${activeVisualTab === 'mbr' ? 'active' : ''}" onclick="switchVisualTab('mbr')">MBR Report</div>
+        </div>
+      </div>
+      
+      <div id="visuals-content"></div>
     </div>
-
-    <div id="visuals-content"></div>
   `;
   renderVisualContent();
 }
