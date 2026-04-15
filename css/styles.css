@@ -369,7 +369,10 @@ select {
 .metric-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px 16px;
+  transition: var(--transition);
 }
+.metric-card.clickable { cursor: pointer; }
+.metric-card.clickable:hover { background: var(--surface-hover); border-color: var(--accent-light); transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .metric-label { font-size: 11.5px; color: var(--text-muted); margin-bottom: 5px; }
 .metric-value { font-size: 28px; font-weight: 300; font-family: var(--font-heading); }
 .metric-delta { font-size: 11.5px; margin-top: 2px; color: var(--text-muted); }

@@ -387,22 +387,22 @@ function renderDashboard() {
     </div>
     <div class="page-body">
       <div class="metrics-grid">
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="showAppPage('programs')">
           <div class="metric-label">Active programs</div>
           <div class="metric-value">${stats.activePrograms}</div>
           <div class="metric-delta">${stats.onTrack} on track &middot; ${stats.atWatch} at watch</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="showAppPage('history')">
           <div class="metric-label">Updates this week</div>
           <div class="metric-value">${stats.updatesThisWeek}</div>
           <div class="metric-delta up">AI-generated</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="showAppPage('history')">
           <div class="metric-label">Hours saved est.</div>
           <div class="metric-value" style="color:var(--success)">${Math.round(stats.updatesThisWeek * 1.5)}</div>
           <div class="metric-delta up">this week</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="showAppPage('risks')">
           <div class="metric-label">Risk signals</div>
           <div class="metric-value" style="color:${stats.riskCount > 0 ? 'var(--warn)' : 'var(--success)'}">${stats.riskCount}</div>
           <div class="metric-delta ${stats.riskCount > 0 ? 'warn' : ''}">${stats.riskCount > 0 ? 'Needs attention' : 'All clear'}</div>
