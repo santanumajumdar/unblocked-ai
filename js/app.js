@@ -94,6 +94,7 @@ function renderPage(name) {
     visuals:   renderVisuals,
     integrations: renderIntegrationsPage,
     monitoring: renderMonitoring,
+    coaching:   renderCoaching,
     settings:  renderSettings
   };
   if (renders[name]) renders[name]();
@@ -273,6 +274,7 @@ function renderApp() {
            <div id="apppage-visuals"   class="app-page"></div>
           <div id="apppage-integrations" class="app-page"></div>
           <div id="apppage-monitoring"   class="app-page"></div>
+          <div id="apppage-coaching"     class="app-page"></div>
           <div id="apppage-settings"     class="app-page"></div>
         </div>
       </div>
@@ -347,6 +349,7 @@ function renderSidebar() {
       <div class="nav-item" id="nav-risks"     data-page="risks">${ICONS.risks} Risk Radar <span class="nav-pill nav-pill-red" id="risk-count-badge"></span></div>
        <div id="nav-visuals"   data-page="visuals" class="nav-item">${ICONS.visuals} Portfolio Visuals <span class="nav-pill nav-pill-blue">NEW</span></div>
       <div id="nav-monitoring" data-page="monitoring" class="nav-item">${ICONS.generate} AI Insights <span class="nav-pill nav-pill-blue">BETA</span></div>
+      <div id="nav-coaching"   data-page="coaching"   class="nav-item">🛡️ TPM Coaching <span class="nav-pill nav-pill-blue">BETA</span></div>
       <div id="nav-integrations" data-page="integrations" class="nav-item">${ICONS.slack} Integrations</div>
       <div class="nav-label" style="margin-top:10px;">Account</div>
       <div class="nav-item" id="nav-settings"  data-page="settings">${ICONS.settings} Settings</div>
@@ -729,10 +732,73 @@ window.doSlackPublish = async function() {
 
 function renderOutputContent() {
   const sg = state.generate;
-  return Object.entries(sg.outputs).map(([persona, html]) =>
-    `<div class="output-text" id="output-text-${persona}" style="${persona !== sg.activeTab ? 'display:none' : ''}">${html}</div>`
-  ).join('');
+  return `
+    <div class="draft-partner-layout">
+      <div class="draft-outputs-container">
+        ${Object.entries(sg.outputs).map(([persona, html]) =>
+          `<div class="output-text" id="output-text-${persona}" style="${persona !== sg.activeTab ? 'display:none' : ''}">${html}</div>`
+        ).join('')}
+      </div>
+      <div class="draft-sidebar" id="draft-sidebar">
+        <div class="sidebar-chat-header">
+          ${ICONS.generate} AI Drafting Partner
+        </div>
+        <div class="sidebar-chat-messages" id="refinement-messages">
+          <div class="chat-msg ai">How should I refine the <strong>${PERSONA_LABELS[sg.activeTab]}</strong> update?</div>
+        </div>
+        <div class="sidebar-chat-input">
+          <input type="text" id="refinement-input" placeholder="e.g. 'Make it more technical'..." onkeydown="if(event.key==='Enter') doRefineDraft()">
+          <button class="chat-send" onclick="doRefineDraft()">${ICONS.arrowRight}</button>
+        </div>
+      </div>
+    </div>
+  `;
 }
+
+window.doRefineDraft = async function() {
+  const sg = state.generate;
+  const input = document.getElementById('refinement-input');
+  const msgBox = document.getElementById('refinement-messages');
+  const targetEl = document.getElementById(`output-text-${sg.activeTab}`);
+  
+  if (!input || !input.value.trim() || !targetEl) return;
+  const prompt = input.value.trim();
+  const currentText = targetEl.innerText || targetEl.textContent;
+  
+  // Add user message
+  const userMsg = document.createElement('div');
+  userMsg.className = 'chat-msg user';
+  userMsg.textContent = prompt;
+  msgBox.appendChild(userMsg);
+  input.value = '';
+  msgBox.scrollTop = msgBox.scrollHeight;
+
+  // AI response indicator
+  const aiMsg = document.createElement('div');
+  aiMsg.className = 'chat-msg ai pulse';
+  aiMsg.textContent = 'Refining...';
+  msgBox.appendChild(aiMsg);
+  msgBox.scrollTop = msgBox.scrollHeight;
+
+  try {
+    await refineStatusUpdate(currentText, prompt, targetEl, 
+      (refinedText) => {
+        sg.outputs[sg.activeTab] = targetEl.innerHTML;
+        aiMsg.classList.remove('pulse');
+        aiMsg.textContent = 'Updated draft accordingly.';
+        msgBox.scrollTop = msgBox.scrollHeight;
+        toast('Draft updated!', 'success');
+      },
+      (err) => {
+        aiMsg.classList.remove('pulse');
+        aiMsg.innerHTML = `<span style="color:var(--danger)">${err}</span>`;
+        toast(err, 'error');
+      }
+    );
+  } catch (err) {
+    aiMsg.textContent = 'Failed to refine.';
+  }
+};
 
 // ── GENERATE LOGIC ────────────────────────────────────────────────
 window.doGenerate = async function() {
@@ -855,6 +921,12 @@ window.switchOutputTab = function(persona) {
   document.querySelectorAll('[id^="output-text-"]').forEach(el => el.style.display = 'none');
   const target = document.getElementById(`output-text-${persona}`);
   if (target) target.style.display = 'block';
+
+  // Update chat partner greeting
+  const msgBox = document.getElementById('refinement-messages');
+  if (msgBox) {
+    msgBox.innerHTML = `<div class="chat-msg ai">How should I refine the <strong>${PERSONA_LABELS[persona]}</strong> update?</div>`;
+  }
 };
 
 window.doCopy = function() {
@@ -2491,3 +2563,115 @@ window.showIntegrationModal = function(type) {
     };
   }
 };
+
+// ── TPM COACHING AGENT ──────────────────────────────────────────
+function renderCoaching() {
+  const programs = getPrograms();
+  const contention = getContentionReport();
+  const el = document.getElementById('apppage-coaching');
+  
+  // Heuristics
+  const stale = programs.filter(p => !p.lastUpdated || (Date.now() - p.lastUpdated > 7 * 86400000));
+  const missingMilestones = programs.filter(p => !p.milestone || p.milestone === 'TBD');
+  const criticalRisks = getActiveRisks().filter(r => r.severity === 'high');
+
+  const advice = [];
+  
+  if (stale.length > 0) {
+    advice.push({
+      id: 'stale',
+      icon: '⏰',
+      title: 'Stale Program Updates',
+      desc: `${stale.length} program${stale.length>1?'s':''} haven't been updated in over 7 days. Stale data reduces portfolio visibility.`,
+      actionLabel: 'Update stale programs',
+      action: () => showAppPage('programs')
+    });
+  }
+
+  if (missingMilestones.length > 0) {
+    advice.push({
+      id: 'milestones',
+      icon: '🎯',
+      title: 'Vague Timelines',
+      desc: `${missingMilestones.length} programs are missing specific next milestones. This makes tracking velocity difficult for leadership.`,
+      actionLabel: 'Add milestones',
+      action: () => showAppPage('programs')
+    });
+  }
+
+  if (contention.length > 0) {
+    advice.push({
+      id: 'contention',
+      icon: '⚖️',
+      title: 'Resource Contention Detected',
+      desc: `The '${contention[0].entity}' team is mentioned as a blocker across ${contention[0].count} different programs simultaneously.`,
+      actionLabel: 'View contention radar',
+      action: () => showAppPage('monitoring')
+    });
+  }
+
+  if (criticalRisks.length > 0) {
+    advice.push({
+      id: 'risks',
+      icon: '🔥',
+      title: 'Unaddressed High Risks',
+      desc: `There are ${criticalRisks.length} high-severity risks in Risk Radar that haven't been acknowledged or escalated yet.`,
+      actionLabel: 'Review risks',
+      action: () => showAppPage('risks')
+    });
+  }
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-title">TPM <em>Coaching</em> Agent</div>
+        <div class="page-subtitle">Proactive portfolio advice to keep your programs running smoothly.</div>
+      </div>
+      <button class="btn btn-secondary" onclick="toast('Deep AI Analysis triggered... (Demo mode)','info')">
+        ${ICONS.refresh} Refresh Intelligence
+      </button>
+    </div>
+    <div class="page-body">
+      ${advice.length === 0 ? `
+        <div class="card">
+          <div class="empty-state">
+            <div class="empty-icon">🏆</div>
+            <div class="empty-title">You're on top of it!</div>
+            <div class="empty-desc">The Coaching Agent finds no critical gaps in your portfolio hygiene right now.</div>
+          </div>
+        </div>` : `
+        <div class="coach-grid">
+          ${advice.map(a => `
+            <div class="coach-card">
+              <div class="coach-icon">${a.icon}</div>
+              <div class="coach-title">${a.title}</div>
+              <div class="coach-desc">${a.desc}</div>
+              <div class="coach-action" id="coach-action-${a.id}">
+                ${ICONS.arrowRight} ${a.actionLabel}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+
+      <div class="card-raised mt-24" style="background:var(--blue-dim); border-color:var(--blue-light);">
+        <div class="flex items-center gap-12">
+          <div style="font-size:24px;">🧠</div>
+          <div>
+            <div style="font-size:14px; font-weight:600; color:var(--blue-light);">AI Strategy Insight</div>
+            <div style="font-size:13px; color:var(--text-primary); margin-top:4px;">
+              Based on your recent status updates, your portfolio has a <strong>82% confidence score</strong> for Q2 delivery. 
+              The primary risk remains cross-team dependency management between Platform and Developer Experience.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Bind actions
+  advice.forEach(a => {
+    const btn = document.getElementById(`coach-action-${a.id}`);
+    if (btn) btn.onclick = a.action;
+  });
+}

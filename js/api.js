@@ -577,3 +577,106 @@ export async function generateAllPersonas(programData, personas, onPersonaDone, 
   }
   if (onAllDone) onAllDone(results);
 }
+/**
+ * refineStatusUpdate — Takes an existing draft and an instruction to refine it
+ */
+export async function refineStatusUpdate(currentText, instruction, targetEl, onDone, onError) {
+  const provider = getProvider();
+  const apiKey = getApiKey(provider);
+
+  if (!apiKey) {
+    onError(`No API key set.`);
+    return;
+  }
+
+  // --- MOCK MODE ---
+  if (apiKey === MOCK_KEY) {
+    targetEl.innerHTML = `<div class="pulse-row"><div class="pulse-dot"></div><div class="pulse-dot"></div><div class="pulse-dot"></div><span style="margin-left:8px;">Refining draft…</span></div>`;
+    await new Promise(r => setTimeout(r, 800));
+    const refined = `**[REFINED PREVIEW]**\n\n${currentText.slice(0, 100)}... (Refinement applied: ${instruction})\n\nThis is a mock refinement. In live mode, the AI would rewrite this according to your instructions.`;
+    targetEl.innerHTML = formatOutputText(refined);
+    if (onDone) onDone(refined);
+    return;
+  }
+
+  const systemPrompt = `You are a Senior Technical Program Manager. You are helping a colleague refine a status update.
+Take the provided CURRENT DRAFT and modify it according to the REFINEMENT INSTRUCTION. 
+Maintain the same persona and context, but apply the requested changes accurately.
+Return only the revised status update text.`;
+
+  const userPrompt = `CURRENT DRAFT:\n${currentText}\n\nREFINEMENT INSTRUCTION:\n${instruction}`;
+
+  targetEl.innerHTML = `<div class="pulse-row"><div class="pulse-dot"></div><div class="pulse-dot"></div><div class="pulse-dot"></div><span style="margin-left:8px;">Applying AI refinement…</span></div>`;
+
+  try {
+    if (provider === 'gemini') {
+      const resp = await fetch(`${API_URLS.gemini}?key=${apiKey}&alt=sse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER PROMPT:\n${userPrompt}` }] }],
+          generationConfig: { maxOutputTokens: 1000, temperature: 0.7 }
+        })
+      });
+      if (!resp.ok) throw new Error(`Gemini error ${resp.status}`);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      targetEl.innerHTML = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.slice(6).trim());
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) { fullText += text; targetEl.innerHTML = formatOutputText(fullText) + '<span class="cursor"></span>'; }
+          } catch {}
+        }
+      }
+      targetEl.innerHTML = formatOutputText(fullText);
+      if (onDone) onDone(fullText);
+    } else {
+      const resp = await fetch(API_URLS.anthropic, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: MODELS.anthropic,
+          max_tokens: 1000,
+          stream: true,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        })
+      });
+      if (!resp.ok) throw new Error(`Anthropic error ${resp.status}`);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      targetEl.innerHTML = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.slice(6).trim());
+            if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
+              fullText += data.delta.text;
+              targetEl.innerHTML = formatOutputText(fullText) + '<span class="cursor"></span>';
+            }
+          } catch {}
+        }
+      }
+      targetEl.innerHTML = formatOutputText(fullText);
+      if (onDone) onDone(fullText);
+    }
+  } catch (err) { onError(err.message || 'Refinement failed'); }
+}

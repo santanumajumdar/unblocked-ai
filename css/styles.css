@@ -807,3 +807,125 @@ select {
 .int-github .int-icon-box { background: rgba(255, 255, 255, 0.08); color: #FFFFFF; }
 .int-slack .int-icon-box { background: rgba(224, 30, 90, 0.15); color: #E01E5A; }
 .int-google .int-icon-box { background: rgba(66, 133, 244, 0.15); color: #4285F4; }
+
+/* ── DRAFTING PARTNER ───────────────────────────────────── */
+.draft-partner-layout {
+  display: flex;
+  gap: 0;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  min-height: 480px;
+}
+.draft-outputs-container {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: rgba(13, 17, 23, 0.4);
+}
+.draft-sidebar {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(22, 27, 34, 0.5);
+  backdrop-filter: blur(8px);
+}
+.sidebar-chat-header {
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--blue-light);
+}
+.sidebar-chat-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-msg {
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  max-width: 90%;
+}
+.chat-msg.ai {
+  background: var(--surface-light);
+  color: var(--text-primary);
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+}
+.chat-msg.user {
+  background: var(--blue-dim);
+  color: var(--blue-light);
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+.sidebar-chat-input {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+.sidebar-chat-input input {
+  flex: 1;
+  background: rgba(13, 17, 23, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.chat-send {
+  background: var(--blue-dim);
+  color: var(--blue-light);
+  border: none;
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.chat-send:hover { background: var(--blue-light); color: white; }
+
+/* Pulse animation for 'Refining...' */
+.pulse { animation: chat-pulse 1.5s infinite ease-in-out; }
+@keyframes chat-pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* Base styles for output-panel fix */
+.output-panel {
+  padding: 0 !important; /* Managed by draft-partner-layout */
+}
+
+/* ── COACHING PAGE ────────────────────────────────────────── */
+.coach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+.coach-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px;
+  position: relative; overflow: hidden;
+  transition: var(--transition);
+}
+.coach-card:hover { border-color: var(--blue-light); transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.coach-card::before {
+  content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+  background: var(--blue-light); opacity: 0.6;
+}
+.coach-icon { font-size: 24px; margin-bottom: 12px; }
+.coach-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
+.coach-desc { font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; }
+.coach-action { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--blue-light); cursor: pointer; }
+.coach-action:hover { text-decoration: underline; }
