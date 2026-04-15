@@ -25,6 +25,8 @@ import {
   syncJiraData, syncGitHubData, publishToSlack
 } from './integrations.js';
 
+import { renderCoaching } from './productivity.js';
+
 
 import {
   toast, openModal, confirm as uiConfirm, copyText,
@@ -94,7 +96,7 @@ function renderPage(name) {
     visuals:   renderVisuals,
     integrations: renderIntegrationsPage,
     monitoring: renderMonitoring,
-    coaching:   renderCoaching,
+    coaching:   () => renderCoaching(document.getElementById('apppage-coaching'), showAppPage),
     settings:  renderSettings
   };
   if (renders[name]) renders[name]();
@@ -1950,25 +1952,9 @@ window.doProcessTranscript = async function() {
           lastUpdated: Date.now()
         });
       }
-      showAppPage('generate');
-      setTimeout(() => {
-        const progSelect = document.getElementById('gen-program');
-        if (progSelect) {
-          progSelect.value = prog.id;
-          progSelect.dispatchEvent(new Event('change'));
-        }
-        // Pre-fill fields
-        setTimeout(() => {
-          const b = document.getElementById('gen-blockers');
-          const m = document.getElementById('gen-milestones');
-          if (b) b.value = data.blockers || '';
-          if (m) m.value = data.milestones || '';
-        }, 100);
-
-        toast('Transcript signals pre-filled!', 'success');
-      }, 50);
+      toast('Intelligence imported. Ready to generate.', 'success');
+      showAppPage('generate', prog.id);
     };
-    
   }, (err) => {
     setButtonLoading(btn, false);
     toast(err, 'error');
@@ -2574,115 +2560,3 @@ window.showIntegrationModal = function(type) {
     };
   }
 };
-
-// ── TPM COACHING AGENT ──────────────────────────────────────────
-function renderCoaching() {
-  const programs = getPrograms();
-  const contention = getContentionReport();
-  const el = document.getElementById('apppage-coaching');
-  
-  // Heuristics
-  const stale = programs.filter(p => !p.lastUpdated || (Date.now() - p.lastUpdated > 7 * 86400000));
-  const missingMilestones = programs.filter(p => !p.milestone || p.milestone === 'TBD');
-  const criticalRisks = getActiveRisks().filter(r => r.severity === 'high');
-
-  const advice = [];
-  
-  if (stale.length > 0) {
-    advice.push({
-      id: 'stale',
-      icon: '⏰',
-      title: 'Stale Program Updates',
-      desc: `${stale.length} program${stale.length>1?'s':''} haven't been updated in over 7 days. Stale data reduces portfolio visibility.`,
-      actionLabel: 'Update stale programs',
-      action: () => showAppPage('programs')
-    });
-  }
-
-  if (missingMilestones.length > 0) {
-    advice.push({
-      id: 'milestones',
-      icon: '🎯',
-      title: 'Vague Timelines',
-      desc: `${missingMilestones.length} programs are missing specific next milestones. This makes tracking velocity difficult for leadership.`,
-      actionLabel: 'Add milestones',
-      action: () => showAppPage('programs')
-    });
-  }
-
-  if (contention.length > 0) {
-    advice.push({
-      id: 'contention',
-      icon: '⚖️',
-      title: 'Resource Contention Detected',
-      desc: `The '${contention[0].entity}' team is mentioned as a blocker across ${contention[0].count} different programs simultaneously.`,
-      actionLabel: 'View contention radar',
-      action: () => showAppPage('monitoring')
-    });
-  }
-
-  if (criticalRisks.length > 0) {
-    advice.push({
-      id: 'risks',
-      icon: '🔥',
-      title: 'Unaddressed High Risks',
-      desc: `There are ${criticalRisks.length} high-severity risks in Risk Radar that haven't been acknowledged or escalated yet.`,
-      actionLabel: 'Review risks',
-      action: () => showAppPage('risks')
-    });
-  }
-
-  el.innerHTML = `
-    <div class="page-header">
-      <div>
-        <div class="page-title">TPM <em>Coaching</em> Agent</div>
-        <div class="page-subtitle">Proactive portfolio advice to keep your programs running smoothly.</div>
-      </div>
-      <button class="btn btn-secondary" onclick="toast('Deep AI Analysis triggered... (Demo mode)','info')">
-        ${ICONS.refresh} Refresh Intelligence
-      </button>
-    </div>
-    <div class="page-body">
-      ${advice.length === 0 ? `
-        <div class="card">
-          <div class="empty-state">
-            <div class="empty-icon">🏆</div>
-            <div class="empty-title">You're on top of it!</div>
-            <div class="empty-desc">The Coaching Agent finds no critical gaps in your portfolio hygiene right now.</div>
-          </div>
-        </div>` : `
-        <div class="coach-grid">
-          ${advice.map(a => `
-            <div class="coach-card">
-              <div class="coach-icon">${a.icon}</div>
-              <div class="coach-title">${a.title}</div>
-              <div class="coach-desc">${a.desc}</div>
-              <div class="coach-action" id="coach-action-${a.id}">
-                ${ICONS.arrowRight} ${a.actionLabel}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      `}
-
-      <div class="card-raised mt-24" style="background:var(--blue-dim); border-color:var(--blue-light);">
-        <div class="flex items-center gap-12">
-          <div style="font-size:24px;">🧠</div>
-          <div>
-            <div style="font-size:14px; font-weight:600; color:var(--blue-light);">AI Strategy Insight</div>
-            <div style="font-size:13px; color:var(--text-primary); margin-top:4px;">
-              Based on your recent status updates, your portfolio has a <strong>82% confidence score</strong> for Q2 delivery. 
-              The primary risk remains cross-team dependency management between Platform and Developer Experience.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Bind actions
-  advice.forEach(a => {
-    const btn = document.getElementById(`coach-action-${a.id}`);
-    if (btn) btn.onclick = a.action;
-  });
-}
