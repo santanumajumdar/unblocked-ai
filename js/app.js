@@ -1332,12 +1332,12 @@ function renderDependencyMapper(container) {
     return;
   }
 
+  const graphDef = `flowchart TD\n${links.join('\n')}\n${programs.map(p => `class ${p.id} ${p.rag}`).join('\n')}`;
+
   container.innerHTML = `
     <div class="card p-24" style="background: #0D1117;">
-      <div class="mermaid" id="mermaid-graph">
-        flowchart TD
-        ${links.join('\n')}
-        ${programs.map(p => `class ${p.id} ${p.rag}`).join('\n')}
+      <div id="mermaid-container" style="display:flex; justify-content:center; align-items:center; min-height: 200px; line-height: 1.5;">
+        <div class="pulse-row"><div class="pulse-dot"></div><span style="color:var(--text-muted); font-size:13px;">Generating visualization...</span></div>
       </div>
     </div>
   `;
@@ -1345,11 +1345,14 @@ function renderDependencyMapper(container) {
   if (window.mermaid) {
     setTimeout(async () => {
       try {
-        await window.mermaid.run({
-          nodes: [container.querySelector('.mermaid')]
-        });
+        const id = 'mermaid-svg-' + Date.now();
+        const { svg } = await window.mermaid.render(id, graphDef);
+        const mc = document.getElementById('mermaid-container');
+        if (mc) mc.innerHTML = svg;
       } catch (e) {
         console.error("Mermaid run failed", e);
+        const mc = document.getElementById('mermaid-container');
+        if (mc) mc.innerHTML = `<div style="color:var(--danger); font-size:13px;">Visual generation failed. Please check dependencies.</div>`;
       }
     }, 50);
   }
