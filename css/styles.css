@@ -777,8 +777,10 @@ select {
 .int-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; min-height: 40px; }
 .int-meta { border-top: 1px solid var(--border-light); padding-top: 14px; margin-top: auto; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
 
-/* Brand Colors */
-.int-jira .int-icon-box { background: rgba(0, 82, 204, 0.1); color: #0052CC; }
-.int-github .int-icon-box { background: rgba(0, 0, 0, 0.1); color: #000000; }
-.int-slack .int-icon-box { background: rgba(74, 21, 75, 0.1); color: #4A154B; }
-.int-google .int-icon-box { background: rgba(66, 133, 244, 0.1); color: #4285F4; }
+.int-icon-box svg { width: 24px; height: 24px; }
+
+/* Brand Colors for Dark Theme */
+.int-jira .int-icon-box { background: rgba(38, 132, 255, 0.15); color: #4C9AFF; }
+.int-github .int-icon-box { background: rgba(255, 255, 255, 0.08); color: #FFFFFF; }
+.int-slack .int-icon-box { background: rgba(224, 30, 90, 0.15); color: #E01E5A; }
+.int-google .int-icon-box { background: rgba(66, 133, 244, 0.15); color: #4285F4; }
