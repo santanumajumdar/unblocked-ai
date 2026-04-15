@@ -25,7 +25,7 @@ import {
   syncJiraData, syncGitHubData, publishToSlack
 } from './integrations.js';
 
-import { renderCoaching } from './productivity.js';
+import { renderCoaching, isWatermelon } from './productivity.js';
 
 
 import {
@@ -432,15 +432,21 @@ function renderDashboard() {
           </div>
           <div class="card">
             ${needsUpdate.length === 0 ? `<div class="empty-state" style="padding:30px 20px;"><div class="empty-icon">✅</div><div class="empty-title">All up to date</div><div class="empty-desc">No programs need an update right now.</div></div>` :
-              needsUpdate.map(p => `
+              needsUpdate.map(p => {
+                const watermelon = isWatermelon(p, getActiveRisks());
+                return `
                 <div class="program-row" onclick="goToGenerate('${p.id}')">
                   <div class="program-icon" style="background:var(--${p.rag === 'red' ? 'danger' : p.rag === 'amber' ? 'warn' : 'success'}-bg)">${ragEmoji(p.rag)}</div>
                   <div class="program-info">
                     <div class="program-name">${p.name}</div>
                     <div class="program-meta">Last updated ${p.lastUpdated ? daysAgo(p.lastUpdated) : 'never'} &middot; ${p.team}</div>
                   </div>
-                  <div class="program-right">${ragBadge(p.rag)}</div>
-                </div>`).join('')
+                  <div class="program-right">
+                    ${watermelon ? `<div class="badge badge-error mr-8 pulse-slow">🍉 Artificial Green</div>` : ''}
+                    ${ragBadge(p.rag)}
+                  </div>
+                </div>`;
+              }).join('')
             }
           </div>
         </div>
@@ -1074,6 +1080,7 @@ function renderPrograms() {
                 <div class="program-meta">${p.team} &middot; ${p.quarter} &middot; Next: ${p.milestone || '—'}</div>
               </div>
               <div class="program-right" style="gap:8px;">
+                ${isWatermelon(p, getActiveRisks()) ? `<div class="badge badge-error pulse-slow" title="Metadata inconsistency detected">🍉 Artificial Green</div>` : ''}
                 ${ragBadge(p.rag)}
                 <button class="btn btn-secondary btn-sm" onclick="goToGenerate('${p.id}')">Update</button>
                 <button class="btn btn-ghost btn-sm" onclick="showEditProgramModal('${p.id}')">${ICONS.edit}</button>
@@ -1346,7 +1353,7 @@ function renderPortfolioTimeline(container) {
                 </div>
                 <div class="gantt-track">
                   <div class="gantt-bar-wrap" style="left: ${Math.max(0, posPercent - 20)}%; width: 20%;">
-                    <div class="gantt-bar ${p.rag}" title="Target: ${p.targetDate}">
+                    <div class="gantt-bar ${p.rag} animate-grow-x" title="Target: ${p.targetDate}">
                       <span class="gantt-bar-label">${p.milestone || 'Target'}</span>
                     </div>
                   </div>
@@ -1422,7 +1429,7 @@ function renderDependencyMapper(container) {
 
   container.innerHTML = `
     <div class="card p-24" style="background: #0D1117;">
-      <div id="mermaid-container" style="display:flex; justify-content:center; align-items:center; min-height: 200px; line-height: 1.5;">
+      <div id="mermaid-container" class="animate-fade" style="display:flex; justify-content:center; align-items:center; min-height: 200px; line-height: 1.5;">
         <div class="pulse-row"><div class="pulse-dot"></div><span style="color:var(--text-muted); font-size:13px;">Generating visualization...</span></div>
       </div>
     </div>
@@ -1481,22 +1488,22 @@ function renderMBRReport(container) {
           ${activeMbrFilter !== 'all' ? `<button class="btn btn-ghost btn-sm" onclick="switchMbrFilter('all')">Show All</button>` : ''}
         </div>
         <div class="metrics-grid mb-24">
-          <div class="metric-card clickable ${activeMbrFilter === 'green' ? 'active' : ''}" onclick="switchMbrFilter('green')">
+          <div class="metric-card clickable animate-reveal stagger-1 ${activeMbrFilter === 'green' ? 'active' : ''}" onclick="switchMbrFilter('green')">
             <div class="metric-label">On Track</div>
             <div class="metric-value" style="color:var(--success)">${allPrograms.filter(p => p.rag==='green').length}</div>
           </div>
-          <div class="metric-card clickable ${activeMbrFilter === 'amber' ? 'active' : ''}" onclick="switchMbrFilter('amber')">
+          <div class="metric-card clickable animate-reveal stagger-2 ${activeMbrFilter === 'amber' ? 'active' : ''}" onclick="switchMbrFilter('amber')">
             <div class="metric-label">At Watch</div>
             <div class="metric-value" style="color:var(--warn)">${allPrograms.filter(p => p.rag==='amber').length}</div>
           </div>
-          <div class="metric-card clickable ${activeMbrFilter === 'red' ? 'active' : ''}" onclick="switchMbrFilter('red')">
+          <div class="metric-card clickable animate-reveal stagger-3 ${activeMbrFilter === 'red' ? 'active' : ''}" onclick="switchMbrFilter('red')">
             <div class="metric-label">At Risk</div>
             <div class="metric-value" style="color:var(--danger)">${allPrograms.filter(p => p.rag==='red').length}</div>
           </div>
         </div>
       </div>
 
-      <div class="mbr-section">
+      <div class="mbr-section animate-fade stagger-4">
         <h3 class="mbr-h3">Program Deep-Dive ${activeMbrFilter !== 'all' ? `<span style="font-size:12px; font-weight:400; color:var(--text-muted); margin-left:8px;">(Filtered by ${activeMbrFilter})</span>` : ''}</h3>
         <table class="mbr-table">
           <thead>
@@ -1511,7 +1518,10 @@ function renderMBRReport(container) {
             ${displayPrograms.length === 0 ? `<tr><td colspan="4" class="text-center p-20 color-muted">No programs match this status.</td></tr>` : 
               displayPrograms.map(p => `
                 <tr>
-                  <td class="font-500">${p.name}</td>
+                  <td class="font-500">
+                    ${isWatermelon(p, getActiveRisks()) ? `<span title="Artificial Green (Watermelon) detected" style="cursor:help;">🍉</span> ` : ''}
+                    ${p.name}
+                  </td>
                   <td>${ragBadge(p.rag)}</td>
                   <td class="text-xs color-muted">${truncate(p.blockers || 'None reported', 120)}</td>
                   <td class="text-xs font-500">${p.targetDate || 'TBD'}</td>
@@ -1521,11 +1531,11 @@ function renderMBRReport(container) {
         </table>
       </div>
 
-      <div class="mbr-section mt-24">
+      <div class="mbr-section mt-24 animate-fade stagger-5">
         <h3 class="mbr-h3">Critical Portfolio Risks</h3>
         ${risks.length === 0 ? '<p class="text-xs color-muted">No high-severity risks identified.</p>' : 
-          risks.map(r => `
-            <div class="mbr-risk-item mb-8">
+          risks.map((r, i) => `
+            <div class="mbr-risk-item mb-8 animate-reveal stagger-${Math.min(5, i+1)}">
               <div class="mbr-risk-title ${r.severity}">${r.programName}: ${r.title}</div>
               <div class="mbr-risk-desc">${r.description}</div>
             </div>
@@ -1744,8 +1754,8 @@ function renderSentimentTrends(container) {
           <line x1="${padding}" y1="${getY(0)}" x2="${width-padding}" y2="${getY(0)}" stroke="var(--border)" />
           
           <!-- Area & Path -->
-          <path d="${areaD}" fill="url(#chartGradient)" />
-          <path d="${pathD}" fill="none" stroke="var(--accent-light)" stroke-width="3" filter="url(#glow)" />
+          <path d="${areaD}" fill="url(#chartGradient)" class="area-animated" />
+          <path d="${pathD}" fill="none" stroke="var(--accent-light)" stroke-width="3" filter="url(#glow)" class="path-animated" />
           
           <!-- Points -->
           ${scores.map((s, i) => {
@@ -1813,10 +1823,10 @@ function renderContentionRadar(container) {
           <div class="empty-desc">No repeat blockers detected across your current program portfolio. Resource distribution is optimized for current sprint cycles.</div>
         </div>` : `
         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:16px;">
-          ${contention.map(c => {
+          ${contention.map((c, i) => {
             const severity = c.count >= 3 ? 'danger' : 'warn';
             return `
-              <div class="card p-20" style="background:var(--onyx-deep); border-left: 4px solid var(--${severity}); height:100%;">
+              <div class="card p-20 animate-reveal stagger-${Math.min(5, i+1)}" style="background:var(--onyx-deep); border-left: 4px solid var(--${severity}); height:100%;">
                 <div class="flex items-center justify-between mb-16">
                   <div class="flex items-center gap-10">
                     <div style="width:36px; height:36px; border-radius:10px; background:var(--${severity}-bg); color:var(--${severity}); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--font-mono);">!</div>

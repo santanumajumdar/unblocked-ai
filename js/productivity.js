@@ -3,8 +3,40 @@
  * Focuses on proactive coaching and interactive agent-assisted drafting.
  */
 
-import { getPrograms, getActiveRisks, getContentionReport } from './programs.js';
+import { getPrograms, getActiveRisks, getContentionReport, getRisks } from './programs.js';
 import { ICONS, toast } from './ui.js';
+
+/**
+ * isWatermelon — Heuristic to detect "Artificial Green" programs
+ */
+export function isWatermelon(program, activeRisks = []) {
+  if (program.rag !== 'green') return false;
+  
+  const now = Date.now();
+  
+  // 1. Deadline Check (Past Due or Proximate)
+  if (program.targetDate) {
+    const tDate = new Date(program.targetDate).getTime();
+    if (!isNaN(tDate)) {
+      const diff = (tDate - now) / 86400000;
+      
+      // CASE A: Past Due but still Green? Definitely a Watermelon.
+      if (diff < 0) return true;
+      
+      // CASE B: Target within 14 days and has reported blockers.
+      if (diff < 14 && program.blockers && program.blockers.trim().length > 0) return true;
+    }
+  }
+  
+  // 2. Stale Governance ( > 10 days since last update while Green)
+  if (program.lastUpdated && (now - program.lastUpdated > 10 * 86400000)) return true;
+  
+  // 3. Unaddressed Risks (2+ active risks in registry)
+  const progRisks = activeRisks.filter(r => r.programId === program.id);
+  if (progRisks.length >= 2) return true;
+  
+  return false;
+}
 
 /**
  * generateCoachAdvice — Scans portfolio data for high-impact gaps
@@ -64,6 +96,19 @@ export function generateCoachAdvice() {
       desc: `There are ${criticalRisks.length} high-severity risks that haven't been acknowledged or escalated to senior leadership yet.`,
       actionLabel: 'Review risks',
       targetPage: 'risks'
+    });
+  }
+
+  // Heuristic: Watermelons (Artificial Green)
+  const watermelons = programs.filter(p => isWatermelon(p, activeRisks));
+  if (watermelons.length > 0) {
+    advice.push({
+      id: 'watermelon',
+      icon: '🍉',
+      title: 'Artificial Green Detected',
+      desc: `${watermelons.length} program${watermelons.length > 1 ? 's are' : ' is'} reporting Green despite conflicting metadata (deadlines, blockers, or risks).`,
+      actionLabel: 'Verify reporting integrity',
+      targetPage: 'programs'
     });
   }
 
