@@ -1562,13 +1562,15 @@ function renderMonitoring() {
     </div>
     
     <div class="page-body">
-      <div class="v-tabs mb-24">
-        <div class="v-tab ${activeMonitorTab === 'trends' ? 'active' : ''}" onclick="switchMonitorTab('trends')">Sentiment Trends</div>
-        <div class="v-tab ${activeMonitorTab === 'radar' ? 'active' : ''}" onclick="switchMonitorTab('radar')">Contention Radar</div>
-        <div class="v-tab ${activeMonitorTab === 'meeting' ? 'active' : ''}" onclick="switchMonitorTab('meeting')">Meeting-to-Status</div>
+      <div class="flex justify-start mb-24">
+        <div class="v-tabs">
+          <div class="v-tab ${activeMonitorTab === 'trends' ? 'active' : ''}" onclick="switchMonitorTab('trends')">Sentiment Trends</div>
+          <div class="v-tab ${activeMonitorTab === 'radar' ? 'active' : ''}" onclick="switchMonitorTab('radar')">Contention Radar</div>
+          <div class="v-tab ${activeMonitorTab === 'meeting' ? 'active' : ''}" onclick="switchMonitorTab('meeting')">Meeting-to-Status</div>
+        </div>
       </div>
       
-      <div id="monitoring-content"></div>
+      <div id="monitoring-content" style="padding-top: 4px;"></div>
     </div>
   `;
   renderMonitoringContent();
@@ -1611,10 +1613,10 @@ function renderSentimentTrends(container) {
   areaD += ` L ${getX(scores.length - 1)} ${height - padding} Z`;
 
   container.innerHTML = `
-    <div class="card p-32" style="background: linear-gradient(145deg, var(--onyx-light), var(--onyx-mid)); border: 1px solid var(--border-light);">
+    <div class="card p-32" style="background: linear-gradient(145deg, var(--onyx-light), var(--onyx-mid)); border: 1px solid var(--border-light); overflow: visible;">
       <div class="flex items-center justify-between mb-32">
-        <div>
-          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading);">Portfolio Tone Intelligence</div>
+        <div style="padding-top: 4px;">
+          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading); line-height:1.4;">Portfolio Tone Intelligence</div>
           <div class="text-xs text-secondary" style="letter-spacing:0.02em;">Real-time sentiment trajectory based on executive reporting patterns.</div>
         </div>
         <div class="flex gap-16">
@@ -1673,7 +1675,7 @@ function renderSentimentTrends(container) {
         <div class="flex items-start gap-16">
           <div style="font-size:24px;">${scores[scores.length-1] < 5 ? '⚠️' : '✨'}</div>
           <div>
-            <div style="font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:6px; font-family:var(--font-heading);">Executive Summary & Trend Vector</div>
+            <div style="font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:6px; font-family:var(--font-heading); line-height:1.4;">Executive Summary & Trend Vector</div>
             <div style="font-size:13px; color:var(--text-secondary); line-height:1.6;">
               ${scores[scores.length-1] < scores[scores.length-2] 
                 ? `<span style="color:var(--danger); font-weight:600;">Negative Delta Detected:</span> Portfolio sentiment has shifted by <span style="font-family:var(--font-mono);">${Math.abs(scores[scores.length-1]-scores[scores.length-2])}pts</span>. Historical correlation suggests high risk of milestone slippage in cross-functional streams. Immediate leadership alignment recommended.` 
@@ -1690,10 +1692,10 @@ function renderContentionRadar(container) {
   const contention = getContentionReport();
   
   container.innerHTML = `
-    <div class="card p-32">
+    <div class="card p-32" style="overflow:visible;">
       <div class="flex items-center justify-between mb-24">
-        <div>
-          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading);">Resource Contention Radar</div>
+        <div style="padding-top: 4px;">
+          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading); line-height:1.4;">Resource Contention Radar</div>
           <div class="text-xs text-secondary">Isolating critical bottlenecks blocking multiple program tracks.</div>
         </div>
         <div class="badge badge-blue">Portfolio Coverage: 100%</div>
@@ -1713,8 +1715,8 @@ function renderContentionRadar(container) {
                 <div class="flex items-center justify-between mb-16">
                   <div class="flex items-center gap-10">
                     <div style="width:36px; height:36px; border-radius:10px; background:var(--${severity}-bg); color:var(--${severity}); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--font-mono);">!</div>
-                    <div>
-                      <div style="font-weight:600; font-size:16px; color:var(--text-primary);">${c.entity}</div>
+                    <div style="padding-top: 2px;">
+                      <div style="font-weight:600; font-size:16px; color:var(--text-primary); line-height:1.3;">${c.entity}</div>
                       <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Critical Bottleneck</div>
                     </div>
                   </div>
@@ -1745,17 +1747,17 @@ function renderContentionRadar(container) {
 
 function renderMeetingProcessor(container) {
   container.innerHTML = `
-    <div class="card p-32">
+    <div class="card p-32" style="overflow:visible;">
       <div class="flex items-center justify-between mb-24">
-        <div>
-          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading);">Meeting-to-Status 🎙️</div>
+        <div style="padding-top: 4px;">
+          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading); line-height:1.4;">Meeting-to-Status 🎙️</div>
           <div class="text-xs text-secondary">Convert raw transcripts into high-fidelity program intelligence.</div>
         </div>
       </div>
       
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:32px;">
         <div>
-          <div class="form-group">
+          <div class="form-group" style="padding-top: 2px;">
             <label class="form-label" style="font-size:11px; text-transform:uppercase; color:var(--text-muted);">Transcript Input</label>
             <textarea id="transcript-input" placeholder="Paste your standup notes, Zoom transcript, or Otter.ai export here..." style="min-height:300px; font-size:14px; background:var(--onyx-deep); border-radius:12px; padding:16px;"></textarea>
           </div>
@@ -1773,9 +1775,9 @@ function renderMeetingProcessor(container) {
            
            <div id="transcript-result" style="display:none; height:100%;">
              <div class="intelligence-report" style="height:100%; border-color:var(--accent-dim);">
-                <div class="flex items-center gap-10 mb-20">
+                <div class="flex items-center gap-10 mb-20" style="padding-top: 4px;">
                   <div style="width:30px; height:30px; border-radius:50%; background:var(--accent-glow); color:var(--accent); display:flex; align-items:center; justify-content:center;">${ICONS.check}</div>
-                  <div style="font-weight:600; font-size:15px; font-family:var(--font-heading);">Structured Intelligence Report</div>
+                  <div style="font-weight:600; font-size:15px; font-family:var(--font-heading); line-height:1.4;">Structured Intelligence Report</div>
                 </div>
                 
                 <div id="extracted-content" class="flex flex-col gap-16">
