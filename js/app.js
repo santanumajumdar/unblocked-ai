@@ -1383,10 +1383,17 @@ function renderDependencyMapper(container) {
   }
 }
 
+let activeMbrFilter = 'all';
+
 function renderMBRReport(container) {
-  const programs = getPrograms();
+  const allPrograms = getPrograms();
   const risks = getActiveRisks();
   
+  let displayPrograms = allPrograms;
+  if (activeMbrFilter === 'green') displayPrograms = allPrograms.filter(p => p.rag === 'green');
+  else if (activeMbrFilter === 'amber') displayPrograms = allPrograms.filter(p => p.rag === 'amber');
+  else if (activeMbrFilter === 'red') displayPrograms = allPrograms.filter(p => p.rag === 'red');
+
   container.innerHTML = `
     <div class="mbr-container">
       <div class="mbr-header">
@@ -1395,25 +1402,28 @@ function renderMBRReport(container) {
       </div>
 
       <div class="mbr-section">
-        <h3 class="mbr-h3">Portfolio Health Summary</h3>
+        <div class="flex items-center justify-between mb-12">
+          <h3 class="mbr-h3" style="margin-bottom:0;">Portfolio Health Summary</h3>
+          ${activeMbrFilter !== 'all' ? `<button class="btn btn-ghost btn-sm" onclick="switchMbrFilter('all')">Show All</button>` : ''}
+        </div>
         <div class="metrics-grid mb-24">
-          <div class="metric-card">
+          <div class="metric-card clickable ${activeMbrFilter === 'green' ? 'active' : ''}" onclick="switchMbrFilter('green')">
             <div class="metric-label">On Track</div>
-            <div class="metric-value" style="color:var(--success)">${programs.filter(p => p.rag==='green').length}</div>
+            <div class="metric-value" style="color:var(--success)">${allPrograms.filter(p => p.rag==='green').length}</div>
           </div>
-          <div class="metric-card">
+          <div class="metric-card clickable ${activeMbrFilter === 'amber' ? 'active' : ''}" onclick="switchMbrFilter('amber')">
             <div class="metric-label">At Watch</div>
-            <div class="metric-value" style="color:var(--warn)">${programs.filter(p => p.rag==='amber').length}</div>
+            <div class="metric-value" style="color:var(--warn)">${allPrograms.filter(p => p.rag==='amber').length}</div>
           </div>
-          <div class="metric-card">
+          <div class="metric-card clickable ${activeMbrFilter === 'red' ? 'active' : ''}" onclick="switchMbrFilter('red')">
             <div class="metric-label">At Risk</div>
-            <div class="metric-value" style="color:var(--danger)">${programs.filter(p => p.rag==='red').length}</div>
+            <div class="metric-value" style="color:var(--danger)">${allPrograms.filter(p => p.rag==='red').length}</div>
           </div>
         </div>
       </div>
 
       <div class="mbr-section">
-        <h3 class="mbr-h3">Program Deep-Dive</h3>
+        <h3 class="mbr-h3">Program Deep-Dive ${activeMbrFilter !== 'all' ? `<span style="font-size:12px; font-weight:400; color:var(--text-muted); margin-left:8px;">(Filtered by ${activeMbrFilter})</span>` : ''}</h3>
         <table class="mbr-table">
           <thead>
             <tr>
@@ -1424,14 +1434,15 @@ function renderMBRReport(container) {
             </tr>
           </thead>
           <tbody>
-            ${programs.map(p => `
-              <tr>
-                <td class="font-500">${p.name}</td>
-                <td>${ragBadge(p.rag)}</td>
-                <td class="text-xs color-muted">${truncate(p.blockers || 'None reported', 120)}</td>
-                <td class="text-xs font-500">${p.milestone || 'TBD'}</td>
-              </tr>
-            `).join('')}
+            ${displayPrograms.length === 0 ? `<tr><td colspan="4" class="text-center p-20 color-muted">No programs match this status.</td></tr>` : 
+              displayPrograms.map(p => `
+                <tr>
+                  <td class="font-500">${p.name}</td>
+                  <td>${ragBadge(p.rag)}</td>
+                  <td class="text-xs color-muted">${truncate(p.blockers || 'None reported', 120)}</td>
+                  <td class="text-xs font-500">${p.targetDate || 'TBD'}</td>
+                </tr>
+              `).join('')}
           </tbody>
         </table>
       </div>
@@ -1450,6 +1461,12 @@ function renderMBRReport(container) {
     </div>
   `;
 }
+
+window.switchMbrFilter = function(filter) {
+  if (activeMbrFilter === filter) activeMbrFilter = 'all';
+  else activeMbrFilter = filter;
+  renderVisuals();
+};
 
 function renderBulkReview(programs, modalEl, close) {
   modalEl.innerHTML = `
