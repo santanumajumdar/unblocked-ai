@@ -6,12 +6,12 @@ import {
   getPrograms, saveProgram, deleteProgram, getProgramById, newProgramId,
   getHistory, addHistoryEntry,
   getRisks, getActiveRisks, acknowledgeRisk, dismissRisk,
-  getStats
+  getStats, getContentionReport
 } from './programs.js';
 
 import {
   generateStatusUpdate, extractProgramSignals, getApiKey, setApiKey, clearApiKey, hasApiKey,
-  getProvider, setProvider
+  getProvider, setProvider, analyzeSentiment, processTranscript
 } from './api.js';
 
 import {
@@ -93,6 +93,7 @@ function renderPage(name) {
     risks:     renderRisks,
     visuals:   renderVisuals,
     integrations: renderIntegrationsPage,
+    monitoring: renderMonitoring,
     settings:  renderSettings
   };
   if (renders[name]) renders[name]();
@@ -271,7 +272,8 @@ function renderApp() {
           <div id="apppage-risks"     class="app-page"></div>
            <div id="apppage-visuals"   class="app-page"></div>
           <div id="apppage-integrations" class="app-page"></div>
-          <div id="apppage-settings"  class="app-page"></div>
+          <div id="apppage-monitoring"   class="app-page"></div>
+          <div id="apppage-settings"     class="app-page"></div>
         </div>
       </div>
     </div>
@@ -344,7 +346,8 @@ function renderSidebar() {
       <div class="nav-item" id="nav-history"   data-page="history">${ICONS.history} Update History</div>
       <div class="nav-item" id="nav-risks"     data-page="risks">${ICONS.risks} Risk Radar <span class="nav-pill nav-pill-red" id="risk-count-badge"></span></div>
        <div id="nav-visuals"   data-page="visuals" class="nav-item">${ICONS.visuals} Portfolio Visuals <span class="nav-pill nav-pill-blue">NEW</span></div>
-      <div id="nav-integrations" data-page="integrations" class="nav-item">${ICONS.slack} Integrations <span class="nav-pill nav-pill-blue">BETA</span></div>
+      <div id="nav-monitoring" data-page="monitoring" class="nav-item">${ICONS.generate} AI Insights <span class="nav-pill nav-pill-blue">BETA</span></div>
+      <div id="nav-integrations" data-page="integrations" class="nav-item">${ICONS.slack} Integrations</div>
       <div class="nav-label" style="margin-top:10px;">Account</div>
       <div class="nav-item" id="nav-settings"  data-page="settings">${ICONS.settings} Settings</div>
     </div>
@@ -806,17 +809,23 @@ window.doGenerate = async function() {
     });
   }
 
-  // Save to history
+  // Save to history (with sentiment analysis)
   const firstOutput = Object.values(sg.outputs)[0] || '';
   const preview = firstOutput.replace(/<[^>]+>/g, '').slice(0, 120);
-  addHistoryEntry({
-    programId,
-    programName: programData.name,
-    personas: sg.selectedPersonas,
-    rag: sg.selectedRag,
-    preview,
-    content: sg.outputs,
-    createdAt: Date.now()
+  
+  // Analyze sentiment in background
+  analyzeSentiment(preview).then(sentiment => {
+    addHistoryEntry({
+      programId,
+      programName: programData.name,
+      personas: sg.selectedPersonas,
+      rag: sg.selectedRag,
+      preview,
+      sentimentScore: sentiment.score,
+      sentimentLabel: sentiment.label,
+      content: sg.outputs,
+      createdAt: Date.now()
+    });
   });
 
   // Update program lastUpdated
@@ -1506,7 +1515,231 @@ window.confirmDeleteProgram = function(id) {
   });
 };
 
-// ── HISTORY ───────────────────────────────────────────────────────
+// ── MONITORING ────────────────────────────────────────────────────
+let activeMonitorTab = 'trends';
+
+function renderMonitoring() {
+  updateRiskBadge();
+  const el = document.getElementById('apppage-monitoring');
+  
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-title">AI <em>Insights</em> & Monitoring</div>
+        <div class="page-subtitle">Deep intelligence across your portfolio, sentiment trends, and meeting processing.</div>
+      </div>
+    </div>
+    
+    <div class="page-body">
+      <div class="v-tabs mb-20">
+        <div class="v-tab ${activeMonitorTab === 'trends' ? 'active' : ''}" onclick="switchMonitorTab('trends')">Sentiment Trends</div>
+        <div class="v-tab ${activeMonitorTab === 'radar' ? 'active' : ''}" onclick="switchMonitorTab('radar')">Contention Radar</div>
+        <div class="v-tab ${activeMonitorTab === 'meeting' ? 'active' : ''}" onclick="switchMonitorTab('meeting')">Meeting-to-Status</div>
+      </div>
+      
+      <div id="monitoring-content"></div>
+    </div>
+  `;
+  renderMonitoringContent();
+}
+
+window.switchMonitorTab = function(tab) {
+  activeMonitorTab = tab;
+  renderMonitoring();
+};
+
+function renderMonitoringContent() {
+  const container = document.getElementById('monitoring-content');
+  if (activeMonitorTab === 'trends') renderSentimentTrends(container);
+  else if (activeMonitorTab === 'radar') renderContentionRadar(container);
+  else if (activeMonitorTab === 'meeting') renderMeetingProcessor(container);
+}
+
+function renderSentimentTrends(container) {
+  const history = getHistory().slice(0, 8).reverse();
+  const scores = history.map(h => h.sentimentScore || 7);
+  
+  // Simple SVG Line Chart logic
+  const width = 800;
+  const height = 200;
+  const padding = 40;
+  const points = scores.map((s, i) => {
+    const x = padding + (i * (width - padding * 2) / (scores.length - 1 || 1));
+    const y = height - padding - (s * (height - padding * 2) / 10);
+    return `${x},${y}`;
+  }).join(' ');
+
+  container.innerHTML = `
+    <div class="card p-24">
+      <div class="flex items-center justify-between mb-24">
+        <div>
+          <div class="font-500" style="font-size:16px;">Portfolio Sentiment Trend</div>
+          <div class="text-xs text-muted">Tracking the tone of your last ${history.length} updates</div>
+        </div>
+        <div class="flex gap-12">
+          <div class="flex items-center gap-4 text-xs"><span class="rag-dot" style="background:var(--success)"></span> Confident</div>
+          <div class="flex items-center gap-4 text-xs"><span class="rag-dot" style="background:var(--warn)"></span> Concerning</div>
+          <div class="flex items-center gap-4 text-xs"><span class="rag-dot" style="background:var(--danger)"></span> Urgent</div>
+        </div>
+      </div>
+      
+      <div class="chart-container" style="height:${height}px; width:100%; overflow:hidden;">
+        <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:100%;">
+          <!-- Grid lines -->
+          <line x1="${padding}" y1="${padding}" x2="${width-padding}" y2="${padding}" stroke="var(--border)" stroke-dasharray="4" />
+          <line x1="${padding}" y1="${height/2}" x2="${width-padding}" y2="${height/2}" stroke="var(--border)" stroke-dasharray="4" />
+          <line x1="${padding}" y1="${height-padding}" x2="${width-padding}" y2="${height-padding}" stroke="var(--border)" />
+          
+          <!-- Line -->
+          <polyline points="${points}" fill="none" stroke="var(--accent-light)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          
+          <!-- Points -->
+          ${scores.map((s, i) => {
+            const [x, y] = points.split(' ')[i].split(',');
+            const color = s >= 7 ? 'var(--success)' : s >= 4 ? 'var(--warn)' : 'var(--danger)';
+            return `
+              <circle cx="${x}" cy="${y}" r="5" fill="var(--surface)" stroke="${color}" stroke-width="2" />
+              <text x="${x}" y="${height-10}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${history[i].programName.slice(0,6)}..</text>
+            `;
+          }).join('')}
+        </svg>
+      </div>
+      
+      <div class="mt-24 p-16" style="background:var(--onyx-deep); border-radius:8px; border:1px solid var(--border);">
+        <div style="font-size:13px; font-weight:500; margin-bottom:4px;">${ICONS.history} AI Trend Analysis</div>
+        <div style="font-size:12.5px; color:var(--text-secondary); line-height:1.5;">
+          ${scores[scores.length-1] < scores[scores.length-2] 
+            ? "Attention: Sentiment is trending downwards. Recent updates indicate increasing urgency and potential burnout risk in cross-functional projects." 
+            : "Sentiment remains stable. Teams report high confidence in current Q2 deliverables and milestone alignment."}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderContentionRadar(container) {
+  const contention = getContentionReport();
+  
+  container.innerHTML = `
+    <div class="card p-24">
+      <div class="flex items-center justify-between mb-20">
+        <div>
+          <div class="font-500" style="font-size:16px;">Resource Contention Radar</div>
+          <div class="text-xs text-muted">Detecting bottlenecks listed across 2+ critical programs</div>
+        </div>
+      </div>
+      
+      ${contention.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-icon">🛡️</div>
+          <div class="empty-title">All clear</div>
+          <div class="empty-desc">No repeat blockers detected across your current program portfolio.</div>
+        </div>` : `
+        <div class="contention-list">
+          ${contention.map(c => `
+            <div class="contention-row" style="padding:16px; border:1px solid var(--border); border-radius:12px; margin-bottom:12px; background:rgba(212,175,55,0.03);">
+              <div class="flex items-center justify-between mb-10">
+                <div class="flex items-center gap-8">
+                  <div style="width:32px; height:32px; border-radius:50%; background:var(--danger-bg); color:var(--danger); display:flex; align-items:center; justify-content:center; font-weight:600;">!</div>
+                  <div style="font-weight:600; font-size:15px; color:var(--text-primary);">${c.entity}</div>
+                </div>
+                <div class="badge badge-red">${c.count} Programs Blocked</div>
+              </div>
+              <div style="font-size:12.5px; color:var(--text-secondary);">
+                Impacted: ${c.programs.join(', ')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderMeetingProcessor(container) {
+  container.innerHTML = `
+    <div class="card p-24">
+      <div class="flex items-center justify-between mb-16">
+        <div>
+          <div class="font-500" style="font-size:16px;">Meeting-to-Status</div>
+          <div class="text-xs text-muted">Paste transcripts or rough notes to extract a professional status update.</div>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Meeting Transcript / Notes</label>
+        <textarea id="transcript-input" placeholder="Paste your standup notes, Zoom transcript, or Otter.ai export here..." style="min-height:220px; font-size:13px; line-height:1.6;"></textarea>
+      </div>
+      
+      <button class="btn btn-primary btn-block" id="process-transcript-btn" onclick="doProcessTranscript()">
+        ${ICONS.generate} Extract Status & Insights
+      </button>
+      
+      <div id="transcript-result" class="mt-20" style="display:none;">
+        <div style="font-size:13px; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          ${ICONS.check} Extracted Signals
+        </div>
+        <div id="extracted-content" class="p-16" style="background:var(--surface-dim); border:1px solid var(--border); border-radius:8px; font-size:13px;">
+          <!-- Result injected here -->
+        </div>
+        <button class="btn btn-secondary btn-block mt-12" id="use-extracted-btn">Use this for status generation →</button>
+      </div>
+    </div>
+  `;
+}
+
+window.doProcessTranscript = async function() {
+  const input = document.getElementById('transcript-input').value.trim();
+  if (!input) return toast('Please paste a transcript first', 'error');
+  
+  const btn = document.getElementById('process-transcript-btn');
+  const resultDiv = document.getElementById('transcript-result');
+  const contentEl = document.getElementById('extracted-content');
+  
+  setButtonLoading(btn, true);
+  
+  await processTranscript(input, (data) => {
+    setButtonLoading(btn, false);
+    resultDiv.style.display = 'block';
+    contentEl.innerHTML = `
+      <div style="margin-bottom:8px;"><strong style="color:var(--text-muted)">Program:</strong> ${data.name}</div>
+      <div style="margin-bottom:8px;"><strong style="color:var(--text-muted)">RAG:</strong> ${ragBadge(data.rag)}</div>
+      <div style="margin-bottom:8px;"><strong style="color:var(--text-muted)">Blockers:</strong> ${data.blockers}</div>
+      <div><strong style="color:var(--text-muted)">Milestones:</strong> ${data.milestones}</div>
+    `;
+    
+    document.getElementById('use-extracted-btn').onclick = () => {
+      // Find or Create Program
+      let prog = getPrograms().find(p => p.name.toLowerCase().includes(data.name.toLowerCase()));
+      if (!prog) {
+        prog = saveProgram({
+          id: newProgramId(),
+          name: data.name,
+          team: 'Unassigned',
+          quarter: 'Q2 2026',
+          rag: data.rag,
+          blockers: data.blockers,
+          milestones: data.milestones,
+          lastUpdated: Date.now()
+        });
+      }
+      showAppPage('generate');
+      setTimeout(() => {
+        // Prefill generate fields (heuristic)
+        const progSelect = document.getElementById('gen-program');
+        if (progSelect) {
+          progSelect.value = prog.id;
+          progSelect.dispatchEvent(new Event('change'));
+        }
+        toast('Transcript signals pre-filled!', 'success');
+      }, 50);
+    };
+    
+  }, (err) => {
+    setButtonLoading(btn, false);
+    toast(err, 'error');
+  });
+};
 function renderHistory() {
   updateRiskBadge();
   const history = getHistory();

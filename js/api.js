@@ -177,6 +177,111 @@ Return ONLY valid JSON. If a field is missing, use an empty string. If no progra
   }
 }
 
+/**
+ * analyzeSentiment — Analyzes the tone and sentiment of a status update
+ */
+export async function analyzeSentiment(text) {
+  const provider = getProvider();
+  const apiKey = getApiKey(provider);
+  if (!apiKey || apiKey === MOCK_KEY) return { score: 7, label: 'Neutral' };
+
+  const systemPrompt = `Analyze the sentiment of this TPM status update. 
+Return ONLY JSON in this format: {"score": 1-10, "label": "One word sentiment (e.g. Optimistic, Urgent, Concerning, Confident)"}.
+Scores: 1-3 (Red/At Risk), 4-6 (Amber/At Watch), 7-10 (Green/On Track).`;
+
+  try {
+    if (provider === 'gemini') {
+      const resp = await fetch(`${API_URLS.gemini}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `STATUS TEXT:\n${text}` }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+      const data = await resp.json();
+      return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '{"score":7,"label":"Neutral"}');
+    } else {
+      const resp = await fetch(API_URLS.anthropic, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: MODELS.anthropic,
+          max_tokens: 100,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: `Analyze this content: \n${text}` }]
+        })
+      });
+      const data = await resp.json();
+      return JSON.parse(data.content?.[0]?.text || '{"score":7,"label":"Neutral"}');
+    }
+  } catch { return { score: 7, label: 'Neutral' }; }
+}
+
+/**
+ * processTranscript — Extracts program status components from a meeting transcript
+ */
+export async function processTranscript(transcript, onDone, onError) {
+  const provider = getProvider();
+  const apiKey = getApiKey(provider);
+  if (!apiKey) { onError("Missing API Key"); return; }
+  if (apiKey === MOCK_KEY) { 
+    onDone({ name: "Meeting Project", rag: "amber", blockers: "Extracted from demo transcript", milestones: "Next week rollout" }); 
+    return; 
+  }
+
+  const systemPrompt = `You are a Senior TPM. Extract a program status update from this meeting transcript.
+Identify the program name (if mentioned, else "Meeting Update"), the likely RAG status (green, amber, or red), key blockers/risks, and next milestones.
+
+Return ONLY JSON:
+{
+  "name": "Program Name",
+  "rag": "green|amber|red",
+  "blockers": "Extracted blockers...",
+  "milestones": "Expected next steps..."
+}`;
+
+  try {
+    if (provider === 'gemini') {
+      const resp = await fetch(`${API_URLS.gemini}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `TRANSCRIPT:\n${transcript}` }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+      const data = await resp.json();
+      onDone(JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'));
+    } else {
+      const resp = await fetch(API_URLS.anthropic, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: MODELS.anthropic,
+          max_tokens: 500,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: `Transcript:\n${transcript}` }]
+        })
+      });
+      const data = await resp.json();
+      onDone(JSON.parse(data.content?.[0]?.text || '{}'));
+    }
+  } catch (err) { onError(err.message || "Transcript processing failed"); }
+}
+
 async function generateAnthropic(programData, persona, targetEl, onDone, onError) {
   const apiKey = getApiKey('anthropic');
   const personaConfig = PERSONA_PROMPTS[persona];

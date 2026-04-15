@@ -103,6 +103,8 @@ const DEFAULT_HISTORY = [
     programName: 'Atlas — Global Localization System',
     personas: ['exec', 'pm'],
     rag: 'green',
+    sentimentScore: 8,
+    sentimentLabel: 'Confident',
     preview: 'Phase 1 language model evaluation on track. 3 target markets confirmed. No blockers.',
     content: { exec: 'Status: On Track — Atlas Global Localization\n\nPhase 1 evaluation complete. 3 target markets (DE, JP, BR) confirmed. Engineering at 72% against plan. No blockers. On track for Jun 30 delivery.' },
     createdAt: Date.now() - 1 * 86400000
@@ -113,6 +115,8 @@ const DEFAULT_HISTORY = [
     programName: 'Nexus — Developer Platform Reboot',
     personas: ['exec', 'steering'],
     rag: 'red',
+    sentimentScore: 3,
+    sentimentLabel: 'Urgent',
     preview: 'At risk. DevOps CI/CD dependency blocked 9 days. VP escalation requested.',
     content: { exec: 'Status: At Risk — Nexus Developer Platform\n\nCritical blocker: DevOps CI/CD pipeline dependency open 9 days, no ETA. Mobile SDK descoped to Q3. Requesting VP-level escalation by Apr 18.' },
     createdAt: Date.now() - 2 * 86400000
@@ -123,6 +127,8 @@ const DEFAULT_HISTORY = [
     programName: 'Orion — Cloud Cost Optimization',
     personas: ['pm'],
     rag: 'green',
+    sentimentScore: 9,
+    sentimentLabel: 'Optimistic',
     preview: 'Cost model finalized. Projected 31% infrastructure savings in pilot phase.',
     content: { pm: 'Orion update: Cost model finalized and approved. Pilot with Platform, SRE, and Data Eng teams starting May 1. Projected savings: 31% infra cost reduction. No blockers.' },
     createdAt: Date.now() - 4 * 86400000
@@ -259,6 +265,34 @@ export function dismissRisk(id) {
 
 export function getActiveRisks() {
   return getRisks().filter(r => !r.acknowledged);
+}
+
+// ── MONITORING & CROSS-PROGRAM INSIGHTS ────────────────────────────
+export function getContentionReport() {
+  const programs = getPrograms();
+  const contention = {};
+
+  // Keywords to ignore
+  const ignore = ['and', 'the', 'for', 'with', 'item', 'blocker', 'delay', 'issue', 'need', 'pending'];
+  
+  programs.forEach(p => {
+    if (!p.blockers) return;
+    
+    // Simple heuristic: look for capitalized words or known teams
+    const words = p.blockers.match(/[A-Z][a-z]+/g) || [];
+    const uniqueWords = [...new Set(words)];
+    
+    uniqueWords.forEach(word => {
+      if (ignore.includes(word.toLowerCase())) return;
+      if (!contention[word]) contention[word] = { entity: word, count: 0, programs: [] };
+      contention[word].count++;
+      contention[word].programs.push(p.name);
+    });
+  });
+
+  return Object.values(contention)
+    .filter(c => c.count >= 2) // Flag if 2 or more programs share a keyword
+    .sort((a, b) => b.count - a.count);
 }
 
 // ── STATS ──────────────────────────────────────────────────────────
