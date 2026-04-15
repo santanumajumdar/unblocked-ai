@@ -372,7 +372,17 @@ select {
   transition: var(--transition);
 }
 .metric-card.clickable { cursor: pointer; }
-.metric-card.clickable:hover { background: var(--surface-hover); border-color: var(--accent-light); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.metric-card.clickable:hover { 
+  background: var(--surface-raised); 
+  border-color: var(--accent-light); 
+  transform: translateY(-2px); 
+  box-shadow: 0 8px 24px -10px rgba(0,0,0,0.5); 
+}
+.metric-card.active {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--accent-glow), 0 0 15px var(--accent-glow);
+}
 .metric-label { font-size: 11.5px; color: var(--text-muted); margin-bottom: 5px; }
 .metric-value { font-size: 28px; font-weight: 300; font-family: var(--font-heading); }
 .metric-delta { font-size: 11.5px; margin-top: 2px; color: var(--text-muted); }

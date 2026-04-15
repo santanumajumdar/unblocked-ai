@@ -1948,11 +1948,18 @@ window.reuseHistory = function(id) {
   toast('Program pre-filled. Click Generate to create a fresh update.', 'info');
 };
 
-// ── RISKS ──────────────────────────────────────────────────────────
+let activeRiskFilter = 'all';
+
 function renderRisks() {
   updateRiskBadge();
   const risks = getRisks();
   const active = risks.filter(r => !r.acknowledged);
+  
+  let displayRisks = active;
+  if (activeRiskFilter === 'high') displayRisks = active.filter(r => r.severity === 'high');
+  else if (activeRiskFilter === 'medium') displayRisks = active.filter(r => r.severity === 'medium');
+  else if (activeRiskFilter === 'acknowledged') displayRisks = risks.filter(r => r.acknowledged);
+
   const el = document.getElementById('apppage-risks');
   el.innerHTML = `
     <div class="page-header">
@@ -1960,31 +1967,34 @@ function renderRisks() {
         <div class="page-title">Risk <em>Radar</em></div>
         <div class="page-subtitle">AI-detected signals across your portfolio.</div>
       </div>
-      ${active.length > 0 ? `<span class="badge badge-red"><span class="badge-dot"></span>${active.length} active risk${active.length>1?'s':''}</span>` : ''}
+      <div class="flex items-center gap-12">
+        ${activeRiskFilter !== 'all' ? `<button class="btn btn-ghost btn-sm" onclick="setRiskFilter('all')">Reset View</button>` : ''}
+        ${active.length > 0 ? `<span class="badge badge-red"><span class="badge-dot"></span>${active.length} active risk${active.length>1?'s':''}</span>` : ''}
+      </div>
     </div>
     <div class="page-body">
       <div class="metrics-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
-        <div class="metric-card">
+        <div class="metric-card clickable ${activeRiskFilter === 'high' ? 'active' : ''}" onclick="setRiskFilter('high')">
           <div class="metric-label">High severity</div>
           <div class="metric-value" style="color:var(--danger)">${active.filter(r=>r.severity==='high').length}</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable ${activeRiskFilter === 'medium' ? 'active' : ''}" onclick="setRiskFilter('medium')">
           <div class="metric-label">Medium severity</div>
           <div class="metric-value" style="color:var(--warn)">${active.filter(r=>r.severity==='medium').length}</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable ${activeRiskFilter === 'acknowledged' ? 'active' : ''}" onclick="setRiskFilter('acknowledged')">
           <div class="metric-label">Acknowledged</div>
           <div class="metric-value" style="color:var(--success)">${risks.filter(r=>r.acknowledged).length}</div>
         </div>
       </div>
 
-      ${active.length === 0 ? `
+      ${displayRisks.length === 0 ? `
         <div class="empty-state">
           <div class="empty-icon">🟢</div>
-          <div class="empty-title">Portfolio is clear</div>
-          <div class="empty-desc">No active risk signals detected. Check back after your next program update.</div>
+          <div class="empty-title">${activeRiskFilter === 'all' ? 'Portfolio is clear' : 'No risks match this filter'}</div>
+          <div class="empty-desc">No risk signals matching your selection at this time.</div>
         </div>` :
-        active.map(r => `
+        displayRisks.map(r => `
           <div class="risk-card" style="border-color:var(--${r.severity==='high'?'danger':r.severity==='medium'?'warn':'blue'}-border);">
             <div class="risk-header" style="background:var(--${r.severity==='high'?'danger':r.severity==='medium'?'warn':'blue'}-bg);">
               <div class="flex items-center gap-8">
@@ -1997,7 +2007,7 @@ function renderRisks() {
               ${r.description}
               <div class="risk-body-actions">
                 <button class="btn btn-primary btn-sm" onclick="goToGenerate('${r.programId}');toast('Pre-filled with program context','info')">${ICONS.generate} Generate escalation update</button>
-                <button class="btn btn-ghost btn-sm" onclick="doAcknowledge('${r.id}')">Acknowledge</button>
+                ${!r.acknowledged ? `<button class="btn btn-ghost btn-sm" onclick="doAcknowledge('${r.id}')">Acknowledge</button>` : ''}
                 <button class="btn btn-ghost btn-sm text-danger" onclick="doDismissRisk('${r.id}')">${ICONS.trash} Dismiss</button>
               </div>
             </div>
@@ -2005,6 +2015,12 @@ function renderRisks() {
       }
     </div>`;
 }
+
+window.setRiskFilter = function(filter) {
+  if (activeRiskFilter === filter) activeRiskFilter = 'all';
+  else activeRiskFilter = filter;
+  renderRisks();
+};
 
 window.doAcknowledge = function(id) {
   acknowledgeRisk(id);
