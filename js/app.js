@@ -1769,9 +1769,20 @@ function renderSentimentTrends(container) {
           <div>
             <div style="font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:6px; font-family:var(--font-heading); line-height:1.4;">Executive Summary & Trend Vector</div>
             <div style="font-size:13px; color:var(--text-secondary); line-height:1.6;">
-              ${scores[scores.length-1] < scores[scores.length-2] 
-                ? `<span style="color:var(--danger); font-weight:600;">Negative Delta Detected:</span> Portfolio sentiment has shifted by <span style="font-family:var(--font-mono);">${Math.abs(scores[scores.length-1]-scores[scores.length-2])}pts</span>. Historical correlation suggests high risk of milestone slippage in cross-functional streams. Immediate leadership alignment recommended.` 
-                : `<span style="color:var(--success); font-weight:600;">Stability Confirmed:</span> The tone vector remains positive. Teams are reporting high confidence in current Q2 execution and cross-team dependency resolution.`}
+              ${(() => {
+                const latest = history[history.length - 1];
+                const prev = history[history.length - 2];
+                const isUrgent = latest?.sentimentLabel === 'Urgent' || latest?.sentimentLabel === 'Concerning' || latest?.sentimentLabel === 'Direct';
+                const isFalling = (latest?.sentimentScore || 7) < (prev?.sentimentScore || 7);
+                
+                if (isFalling && isUrgent) {
+                  return `<span style="color:var(--danger); font-weight:600;">🔥 Hidden Burn-out Risk:</span> Sentiment trajectory is shifting toward <span style="font-family:var(--font-mono);">'${latest.sentimentLabel}'</span>. This pattern often precedes RAG regressions. Recommend proactive resource scaling or scope prioritization before milestone slippage occurs.`;
+                } else if (isFalling) {
+                   return `<span style="color:var(--danger); font-weight:600;">Negative Delta Detected:</span> Portfolio sentiment has shifted by <span style="font-family:var(--font-mono);">${Math.abs((latest?.sentimentScore||7)-(prev?.sentimentScore||7))}pts</span>. Historical correlation suggests high risk of milestone slippage in cross-functional streams.`;
+                } else {
+                  return `<span style="color:var(--success); font-weight:600;">Stability Confirmed:</span> The tone vector remains positive. Teams are reporting high confidence in current Q2 execution and cross-team dependency resolution.`;
+                }
+              })()}
             </div>
           </div>
         </div>
