@@ -1523,6 +1523,37 @@ function renderMonitoring() {
   const el = document.getElementById('apppage-monitoring');
   
   el.innerHTML = `
+    <style>
+      @keyframes pulse-ring {
+        0% { transform: scale(.33); opacity: 1; }
+        80%, 100% { opacity: 0; }
+      }
+      .pulse-marker {
+        position: relative;
+        width: 12px; height: 12px;
+      }
+      .pulse-marker::before {
+        content: '';
+        position: absolute; display: block; width: 300%; height: 300%;
+        box-sizing: border-box; margin-left: -100%; margin-top: -100%;
+        border-radius: 45px; background-color: var(--pulse-color, var(--accent));
+        animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+      }
+      .intelligence-report {
+        background: var(--onyx-deep);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+        position: relative;
+        overflow: hidden;
+      }
+      .intelligence-report::after {
+        content: ''; position: absolute; top:0; right:0;
+        width: 150px; height: 150px;
+        background: radial-gradient(circle at 100% 0%, var(--accent-glow) 0%, transparent 70%);
+        pointer-events: none;
+      }
+    </style>
     <div class="page-header">
       <div>
         <div class="page-title">AI <em>Insights</em> & Monitoring</div>
@@ -1531,7 +1562,7 @@ function renderMonitoring() {
     </div>
     
     <div class="page-body">
-      <div class="v-tabs mb-20">
+      <div class="v-tabs mb-24">
         <div class="v-tab ${activeMonitorTab === 'trends' ? 'active' : ''}" onclick="switchMonitorTab('trends')">Sentiment Trends</div>
         <div class="v-tab ${activeMonitorTab === 'radar' ? 'active' : ''}" onclick="switchMonitorTab('radar')">Contention Radar</div>
         <div class="v-tab ${activeMonitorTab === 'meeting' ? 'active' : ''}" onclick="switchMonitorTab('meeting')">Meeting-to-Status</div>
@@ -1556,61 +1587,99 @@ function renderMonitoringContent() {
 }
 
 function renderSentimentTrends(container) {
-  const history = getHistory().slice(0, 8).reverse();
+  const history = getHistory().slice(0, 10).reverse();
   const scores = history.map(h => h.sentimentScore || 7);
   
-  // Simple SVG Line Chart logic
   const width = 800;
-  const height = 200;
-  const padding = 40;
-  const points = scores.map((s, i) => {
-    const x = padding + (i * (width - padding * 2) / (scores.length - 1 || 1));
-    const y = height - padding - (s * (height - padding * 2) / 10);
-    return `${x},${y}`;
-  }).join(' ');
+  const height = 300;
+  const padding = 60;
+  
+  const getX = (i) => padding + (i * (width - padding * 2) / (scores.length - 1 || 1));
+  const getY = (s) => height - padding - (s * (height - padding * 2) / 10);
+
+  // Generate cubic bezier path for smooth spline
+  let pathD = `M ${getX(0)} ${getY(scores[0])}`;
+  let areaD = `M ${getX(0)} ${height - padding} L ${getX(0)} ${getY(scores[0])}`;
+  
+  for (let i = 0; i < scores.length - 1; i++) {
+    const x1 = getX(i), y1 = getY(scores[i]);
+    const x2 = getX(i + 1), y2 = getY(scores[i + 1]);
+    const cx = (x1 + x2) / 2;
+    pathD += ` C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
+    areaD += ` C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
+  }
+  areaD += ` L ${getX(scores.length - 1)} ${height - padding} Z`;
 
   container.innerHTML = `
-    <div class="card p-24">
-      <div class="flex items-center justify-between mb-24">
+    <div class="card p-32" style="background: linear-gradient(145deg, var(--onyx-light), var(--onyx-mid)); border: 1px solid var(--border-light);">
+      <div class="flex items-center justify-between mb-32">
         <div>
-          <div class="font-500" style="font-size:16px;">Portfolio Sentiment Trend</div>
-          <div class="text-xs text-muted">Tracking the tone of your last ${history.length} updates</div>
+          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading);">Portfolio Tone Intelligence</div>
+          <div class="text-xs text-secondary" style="letter-spacing:0.02em;">Real-time sentiment trajectory based on executive reporting patterns.</div>
         </div>
-        <div class="flex gap-12">
-          <div class="flex items-center gap-4 text-xs"><span class="rag-dot" style="background:var(--success)"></span> Confident</div>
-          <div class="flex items-center gap-4 text-xs"><span class="rag-dot" style="background:var(--warn)"></span> Concerning</div>
-          <div class="flex items-center gap-4 text-xs"><span class="rag-dot" style="background:var(--danger)"></span> Urgent</div>
+        <div class="flex gap-16">
+          <div class="flex items-center gap-6 text-xs font-500"><span class="rag-dot" style="background:var(--success); box-shadow:0 0 8px var(--success);"></span> Optimistic</div>
+          <div class="flex items-center gap-6 text-xs font-500"><span class="rag-dot" style="background:var(--warn); box-shadow:0 0 8px var(--warn);"></span> Neutral</div>
+          <div class="flex items-center gap-6 text-xs font-500"><span class="rag-dot" style="background:var(--danger); box-shadow:0 0 8px var(--danger);"></span> Critical</div>
         </div>
       </div>
       
-      <div class="chart-container" style="height:${height}px; width:100%; overflow:hidden;">
-        <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:100%;">
-          <!-- Grid lines -->
-          <line x1="${padding}" y1="${padding}" x2="${width-padding}" y2="${padding}" stroke="var(--border)" stroke-dasharray="4" />
-          <line x1="${padding}" y1="${height/2}" x2="${width-padding}" y2="${height/2}" stroke="var(--border)" stroke-dasharray="4" />
-          <line x1="${padding}" y1="${height-padding}" x2="${width-padding}" y2="${height-padding}" stroke="var(--border)" />
+      <div style="height:${height}px; width:100%; position:relative;">
+        <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:100%; overflow:visible;">
+          <defs>
+            <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2" />
+              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
+            </linearGradient>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
           
-          <!-- Line -->
-          <polyline points="${points}" fill="none" stroke="var(--accent-light)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Y-Axis Labels -->
+          <text x="${padding-15}" y="${getY(10)}" text-anchor="end" font-size="10" fill="var(--text-muted)" font-family="var(--font-mono)">10</text>
+          <text x="${padding-15}" y="${getY(5)}" text-anchor="end" font-size="10" fill="var(--text-muted)" font-family="var(--font-mono)">5</text>
+          <text x="${padding-15}" y="${getY(0)}" text-anchor="end" font-size="10" fill="var(--text-muted)" font-family="var(--font-mono)">0</text>
+
+          <!-- Grid lines -->
+          <line x1="${padding}" y1="${getY(10)}" x2="${width-padding}" y2="${getY(10)}" stroke="var(--border)" stroke-dasharray="4,4" opacity="0.5" />
+          <line x1="${padding}" y1="${getY(5)}" x2="${width-padding}" y2="${getY(5)}" stroke="var(--border)" stroke-dasharray="4,4" opacity="0.5" />
+          <line x1="${padding}" y1="${getY(0)}" x2="${width-padding}" y2="${getY(0)}" stroke="var(--border)" />
+          
+          <!-- Area & Path -->
+          <path d="${areaD}" fill="url(#chartGradient)" />
+          <path d="${pathD}" fill="none" stroke="var(--accent-light)" stroke-width="3" filter="url(#glow)" />
           
           <!-- Points -->
           ${scores.map((s, i) => {
-            const [x, y] = points.split(' ')[i].split(',');
+            const x = getX(i), y = getY(s);
+            const isLast = i === scores.length - 1;
             const color = s >= 7 ? 'var(--success)' : s >= 4 ? 'var(--warn)' : 'var(--danger)';
             return `
-              <circle cx="${x}" cy="${y}" r="5" fill="var(--surface)" stroke="${color}" stroke-width="2" />
-              <text x="${x}" y="${height-10}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${history[i].programName.slice(0,6)}..</text>
+              <g class="chart-point">
+                <circle cx="${x}" cy="${y}" r="4" fill="var(--surface-raised)" stroke="${color}" stroke-width="2" />
+                <text x="${x}" y="${height-20}" text-anchor="middle" font-size="10" fill="${isLast ? 'var(--text-primary)' : 'var(--text-muted)'}" font-weight="${isLast ? '600' : '400'}">${history[i].programName.slice(0,5)}</text>
+              </g>
             `;
           }).join('')}
         </svg>
+        
+        <!-- Pulse for latest point -->
+        <div class="pulse-marker" style="position:absolute; left:${(getX(scores.length-1)/width)*100}%; top:${(getY(scores[scores.length-1])/height)*100}%; --pulse-color:${scores[scores.length-1] >= 7 ? 'var(--success)' : scores[scores.length-1] >= 4 ? 'var(--warn)' : 'var(--danger)'};"></div>
       </div>
       
-      <div class="mt-24 p-16" style="background:var(--onyx-deep); border-radius:8px; border:1px solid var(--border);">
-        <div style="font-size:13px; font-weight:500; margin-bottom:4px;">${ICONS.history} AI Trend Analysis</div>
-        <div style="font-size:12.5px; color:var(--text-secondary); line-height:1.5;">
-          ${scores[scores.length-1] < scores[scores.length-2] 
-            ? "Attention: Sentiment is trending downwards. Recent updates indicate increasing urgency and potential burnout risk in cross-functional projects." 
-            : "Sentiment remains stable. Teams report high confidence in current Q2 deliverables and milestone alignment."}
+      <div class="mt-40 p-20 intelligence-report">
+        <div class="flex items-start gap-16">
+          <div style="font-size:24px;">${scores[scores.length-1] < 5 ? '⚠️' : '✨'}</div>
+          <div>
+            <div style="font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:6px; font-family:var(--font-heading);">Executive Summary & Trend Vector</div>
+            <div style="font-size:13px; color:var(--text-secondary); line-height:1.6;">
+              ${scores[scores.length-1] < scores[scores.length-2] 
+                ? `<span style="color:var(--danger); font-weight:600;">Negative Delta Detected:</span> Portfolio sentiment has shifted by <span style="font-family:var(--font-mono);">${Math.abs(scores[scores.length-1]-scores[scores.length-2])}pts</span>. Historical correlation suggests high risk of milestone slippage in cross-functional streams. Immediate leadership alignment recommended.` 
+                : `<span style="color:var(--success); font-weight:600;">Stability Confirmed:</span> The tone vector remains positive. Teams are reporting high confidence in current Q2 execution and cross-team dependency resolution.`}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1621,35 +1690,53 @@ function renderContentionRadar(container) {
   const contention = getContentionReport();
   
   container.innerHTML = `
-    <div class="card p-24">
-      <div class="flex items-center justify-between mb-20">
+    <div class="card p-32">
+      <div class="flex items-center justify-between mb-24">
         <div>
-          <div class="font-500" style="font-size:16px;">Resource Contention Radar</div>
-          <div class="text-xs text-muted">Detecting bottlenecks listed across 2+ critical programs</div>
+          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading);">Resource Contention Radar</div>
+          <div class="text-xs text-secondary">Isolating critical bottlenecks blocking multiple program tracks.</div>
         </div>
+        <div class="badge badge-blue">Portfolio Coverage: 100%</div>
       </div>
       
       ${contention.length === 0 ? `
         <div class="empty-state">
-          <div class="empty-icon">🛡️</div>
-          <div class="empty-title">All clear</div>
-          <div class="empty-desc">No repeat blockers detected across your current program portfolio.</div>
+          <div class="empty-icon" style="filter: drop-shadow(0 0 10px var(--success));">🛡️</div>
+          <div class="empty-title">Structural Stability Confirmed</div>
+          <div class="empty-desc">No repeat blockers detected across your current program portfolio. Resource distribution is optimized for current sprint cycles.</div>
         </div>` : `
-        <div class="contention-list">
-          ${contention.map(c => `
-            <div class="contention-row" style="padding:16px; border:1px solid var(--border); border-radius:12px; margin-bottom:12px; background:rgba(212,175,55,0.03);">
-              <div class="flex items-center justify-between mb-10">
-                <div class="flex items-center gap-8">
-                  <div style="width:32px; height:32px; border-radius:50%; background:var(--danger-bg); color:var(--danger); display:flex; align-items:center; justify-content:center; font-weight:600;">!</div>
-                  <div style="font-weight:600; font-size:15px; color:var(--text-primary);">${c.entity}</div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:16px;">
+          ${contention.map(c => {
+            const severity = c.count >= 3 ? 'danger' : 'warn';
+            return `
+              <div class="card p-20" style="background:var(--onyx-deep); border-left: 4px solid var(--${severity}); height:100%;">
+                <div class="flex items-center justify-between mb-16">
+                  <div class="flex items-center gap-10">
+                    <div style="width:36px; height:36px; border-radius:10px; background:var(--${severity}-bg); color:var(--${severity}); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--font-mono);">!</div>
+                    <div>
+                      <div style="font-weight:600; font-size:16px; color:var(--text-primary);">${c.entity}</div>
+                      <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Critical Bottleneck</div>
+                    </div>
+                  </div>
                 </div>
-                <div class="badge badge-red">${c.count} Programs Blocked</div>
+                
+                <div class="mb-16">
+                  <div class="flex justify-between text-xs mb-6">
+                    <span style="color:var(--text-secondary);">Contention Score</span>
+                    <span style="font-weight:600; color:var(--${severity});">${Math.min(100, Math.round((c.count / getPrograms().length) * 100))}% Impact</span>
+                  </div>
+                  <div style="height:4px; width:100%; background:var(--border); border-radius:10px; overflow:hidden;">
+                    <div style="height:100%; width:${(c.count / getPrograms().length) * 100}%; background:var(--${severity});"></div>
+                  </div>
+                </div>
+
+                <div style="font-size:12px; color:var(--text-secondary); line-height:1.4;">
+                  <strong style="color:var(--text-muted);">Impacted Streams:</strong><br>
+                  ${c.programs.map(p => `<span style="display:inline-block; margin-top:4px; padding:2px 6px; background:var(--surface-light); border-radius:4px; margin-right:4px;">${p}</span>`).join('')}
+                </div>
               </div>
-              <div style="font-size:12.5px; color:var(--text-secondary);">
-                Impacted: ${c.programs.join(', ')}
-              </div>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       `}
     </div>
@@ -1658,31 +1745,49 @@ function renderContentionRadar(container) {
 
 function renderMeetingProcessor(container) {
   container.innerHTML = `
-    <div class="card p-24">
-      <div class="flex items-center justify-between mb-16">
+    <div class="card p-32">
+      <div class="flex items-center justify-between mb-24">
         <div>
-          <div class="font-500" style="font-size:16px;">Meeting-to-Status</div>
-          <div class="text-xs text-muted">Paste transcripts or rough notes to extract a professional status update.</div>
+          <div class="font-600 mb-4" style="font-size:18px; font-family:var(--font-heading);">Meeting-to-Status 🎙️</div>
+          <div class="text-xs text-secondary">Convert raw transcripts into high-fidelity program intelligence.</div>
         </div>
       </div>
       
-      <div class="form-group">
-        <label class="form-label">Meeting Transcript / Notes</label>
-        <textarea id="transcript-input" placeholder="Paste your standup notes, Zoom transcript, or Otter.ai export here..." style="min-height:220px; font-size:13px; line-height:1.6;"></textarea>
-      </div>
-      
-      <button class="btn btn-primary btn-block" id="process-transcript-btn" onclick="doProcessTranscript()">
-        ${ICONS.generate} Extract Status & Insights
-      </button>
-      
-      <div id="transcript-result" class="mt-20" style="display:none;">
-        <div style="font-size:13px; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-          ${ICONS.check} Extracted Signals
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:32px;">
+        <div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:11px; text-transform:uppercase; color:var(--text-muted);">Transcript Input</label>
+            <textarea id="transcript-input" placeholder="Paste your standup notes, Zoom transcript, or Otter.ai export here..." style="min-height:300px; font-size:14px; background:var(--onyx-deep); border-radius:12px; padding:16px;"></textarea>
+          </div>
+          
+          <button class="btn btn-primary btn-block p-16" id="process-transcript-btn" onclick="doProcessTranscript()" style="font-size:15px; font-weight:600; border-radius:12px;">
+            ${ICONS.generate} Extract Portfolio Signals
+          </button>
         </div>
-        <div id="extracted-content" class="p-16" style="background:var(--surface-dim); border:1px solid var(--border); border-radius:8px; font-size:13px;">
-          <!-- Result injected here -->
+        
+        <div id="transcript-result-container">
+           <div id="transcript-placeholder" class="flex flex-col items-center justify-center" style="height:100%; border:2px dashed var(--border); border-radius:16px; color:var(--text-muted);">
+              <div style="font-size:32px; margin-bottom:12px; opacity:0.3;">📋</div>
+              <div style="font-size:13px;">Intelligence Report will appear here</div>
+           </div>
+           
+           <div id="transcript-result" style="display:none; height:100%;">
+             <div class="intelligence-report" style="height:100%; border-color:var(--accent-dim);">
+                <div class="flex items-center gap-10 mb-20">
+                  <div style="width:30px; height:30px; border-radius:50%; background:var(--accent-glow); color:var(--accent); display:flex; align-items:center; justify-content:center;">${ICONS.check}</div>
+                  <div style="font-weight:600; font-size:15px; font-family:var(--font-heading);">Structured Intelligence Report</div>
+                </div>
+                
+                <div id="extracted-content" class="flex flex-col gap-16">
+                  <!-- Result injected here -->
+                </div>
+                
+                <button class="btn btn-secondary btn-block mt-32" id="use-extracted-btn" style="background:var(--surface-light); border:1px solid var(--border-light);">
+                   Use Intelligence to Generate Status updates →
+                </button>
+             </div>
+           </div>
         </div>
-        <button class="btn btn-secondary btn-block mt-12" id="use-extracted-btn">Use this for status generation →</button>
       </div>
     </div>
   `;
@@ -1693,19 +1798,36 @@ window.doProcessTranscript = async function() {
   if (!input) return toast('Please paste a transcript first', 'error');
   
   const btn = document.getElementById('process-transcript-btn');
-  const resultDiv = document.getElementById('transcript-result');
+  const resultContainer = document.getElementById('transcript-result');
+  const placeholder = document.getElementById('transcript-placeholder');
   const contentEl = document.getElementById('extracted-content');
   
   setButtonLoading(btn, true);
   
   await processTranscript(input, (data) => {
     setButtonLoading(btn, false);
-    resultDiv.style.display = 'block';
+    placeholder.style.display = 'none';
+    resultContainer.style.display = 'block';
+    
     contentEl.innerHTML = `
-      <div style="margin-bottom:8px;"><strong style="color:var(--text-muted)">Program:</strong> ${data.name}</div>
-      <div style="margin-bottom:8px;"><strong style="color:var(--text-muted)">RAG:</strong> ${ragBadge(data.rag)}</div>
-      <div style="margin-bottom:8px;"><strong style="color:var(--text-muted)">Blockers:</strong> ${data.blockers}</div>
-      <div><strong style="color:var(--text-muted)">Milestones:</strong> ${data.milestones}</div>
+      <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+        <div class="card p-12" style="background:var(--surface-light); border:1px solid var(--border);">
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Program</div>
+          <div style="font-size:14px; font-weight:600; color:var(--text-primary);">${data.name}</div>
+        </div>
+        <div class="card p-12" style="background:var(--surface-light); border:1px solid var(--border);">
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">RAG Status</div>
+          <div>${ragBadge(data.rag)}</div>
+        </div>
+      </div>
+      <div class="card p-16" style="background:var(--surface-light); border:1px solid var(--border);">
+        <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Extracted Blockers</div>
+        <div style="font-size:13px; color:var(--text-secondary); line-height:1.5;">${data.blockers || '<span style="opacity:0.5 italic">None detected</span>'}</div>
+      </div>
+      <div class="card p-16" style="background:var(--surface-light); border:1px solid var(--border);">
+        <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Upcoming Milestones</div>
+        <div style="font-size:13px; color:var(--text-secondary); line-height:1.5;">${data.milestones || '<span style="opacity:0.5 italic">None detected</span>'}</div>
+      </div>
     `;
     
     document.getElementById('use-extracted-btn').onclick = () => {
@@ -1725,12 +1847,19 @@ window.doProcessTranscript = async function() {
       }
       showAppPage('generate');
       setTimeout(() => {
-        // Prefill generate fields (heuristic)
         const progSelect = document.getElementById('gen-program');
         if (progSelect) {
           progSelect.value = prog.id;
           progSelect.dispatchEvent(new Event('change'));
         }
+        // Pre-fill fields
+        setTimeout(() => {
+          const b = document.getElementById('gen-blockers');
+          const m = document.getElementById('gen-milestones');
+          if (b) b.value = data.blockers || '';
+          if (m) m.value = data.milestones || '';
+        }, 100);
+
         toast('Transcript signals pre-filled!', 'success');
       }, 50);
     };
