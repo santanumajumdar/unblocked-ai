@@ -19,6 +19,8 @@ const DEFAULT_PROGRAMS = [
     blockers: '',
     decisions: '',
     milestones: 'Finalize savings model — Apr 20. Pilot with 3 teams — May 1. Full rollout — May 8.',
+    dependencies: [],
+    targetDate: '2026-05-08',
     lastUpdated: Date.now() - 2 * 86400000
   },
   {
@@ -32,6 +34,8 @@ const DEFAULT_PROGRAMS = [
     blockers: 'Legal review of data retention policy delayed by 10 days. Awaiting CLO sign-off.',
     decisions: 'Agreed to phase rollout — Tier 1 data first, Tier 2 and 3 in Q3.',
     milestones: 'Legal sign-off — Apr 22. Pilot with Data Eng team — Apr 28. Phase 1 go-live — Apr 30.',
+    dependencies: ['prog_1'],
+    targetDate: '2026-04-30',
     lastUpdated: Date.now() - 5 * 86400000
   },
   {
@@ -45,6 +49,8 @@ const DEFAULT_PROGRAMS = [
     blockers: 'Core infra dependency on the DevOps team unresolved for 9 days. No ETA. CI/CD pipeline migration blocked.',
     decisions: 'Descoped mobile SDK support to Q3. Headcount request for 2 contractors approved.',
     milestones: 'DevOps unblock — Apr 18. API gateway migration — May 1. Beta launch — May 15.',
+    dependencies: ['prog_5'],
+    targetDate: '2026-05-15',
     lastUpdated: Date.now() - 9 * 86400000
   },
   {
@@ -58,6 +64,8 @@ const DEFAULT_PROGRAMS = [
     blockers: '',
     decisions: '',
     milestones: 'Language model evaluation — May 10. Pilot with 3 markets — Jun 1. Full rollout — Jun 30.',
+    dependencies: ['prog_3'],
+    targetDate: '2026-06-30',
     lastUpdated: Date.now() - 1 * 86400000
   },
   {
@@ -158,7 +166,23 @@ const DEFAULT_RISKS = [
 export function getPrograms() {
   try {
     const raw = localStorage.getItem(PROGRAMS_KEY);
-    return raw ? JSON.parse(raw) : initPrograms();
+    let programs = raw ? JSON.parse(raw) : initPrograms();
+    
+    // Migration: ensure targetDate and dependencies exist
+    let changed = false;
+    programs = programs.map(p => {
+      const defaultP = DEFAULT_PROGRAMS.find(dp => dp.id === p.id);
+      if (defaultP) {
+        if (p.targetDate === undefined) { p.targetDate = defaultP.targetDate || ''; changed = true; }
+        if (p.dependencies === undefined) { p.dependencies = defaultP.dependencies || []; changed = true; }
+      } else {
+        if (p.targetDate === undefined) { p.targetDate = ''; changed = true; }
+        if (p.dependencies === undefined) { p.dependencies = []; changed = true; }
+      }
+      return p;
+    });
+    if (changed) localStorage.setItem(PROGRAMS_KEY, JSON.stringify(programs));
+    return programs;
   } catch { return initPrograms(); }
 }
 

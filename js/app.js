@@ -87,6 +87,7 @@ function renderPage(name) {
     programs:  renderPrograms,
     history:   renderHistory,
     risks:     renderRisks,
+    visuals:   renderVisuals,
     settings:  renderSettings
   };
   if (renders[name]) renders[name]();
@@ -263,6 +264,7 @@ function renderApp() {
           <div id="apppage-programs"  class="app-page"></div>
           <div id="apppage-history"   class="app-page"></div>
           <div id="apppage-risks"     class="app-page"></div>
+          <div id="apppage-visuals"   class="app-page"></div>
           <div id="apppage-settings"  class="app-page"></div>
         </div>
       </div>
@@ -335,6 +337,7 @@ function renderSidebar() {
       <div class="nav-item" id="nav-programs"  data-page="programs">${ICONS.programs} My Programs</div>
       <div class="nav-item" id="nav-history"   data-page="history">${ICONS.history} Update History</div>
       <div class="nav-item" id="nav-risks"     data-page="risks">${ICONS.risks} Risk Radar <span class="nav-pill nav-pill-red" id="risk-count-badge"></span></div>
+      <div class="nav-item" id="nav-visuals"   data-page="visuals">${ICONS.visuals} Portfolio Visuals <span class="nav-pill nav-pill-blue">NEW</span></div>
       <div class="nav-label" style="margin-top:10px;">Account</div>
       <div class="nav-item" id="nav-settings"  data-page="settings">${ICONS.settings} Settings</div>
     </div>
@@ -954,8 +957,18 @@ function showProgramModal(program) {
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Next milestone date</label>
-        <input type="text" id="pf-milestone" placeholder="May 15" value="${program?.milestone || ''}">
+        <label class="form-label">Target Completion Date</label>
+        <input type="date" id="pf-date" value="${program?.targetDate || ''}">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">Key Milestone (Text)</label>
+        <input type="text" id="pf-milestone" placeholder="e.g. May 15" value="${program?.milestone || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Blocks Programs (IDs)</label>
+        <input type="text" id="pf-deps" placeholder="e.g. prog_1, prog_3" value="${(program?.dependencies || []).join(', ')}">
       </div>
     </div>
     <div class="form-group">
@@ -1014,6 +1027,7 @@ function showProgramModal(program) {
             if (p.rag) el.querySelector('#pf-rag').value = p.rag;
             if (p.milestone) el.querySelector('#pf-milestone').value = p.milestone;
             if (p.blockers) el.querySelector('#pf-blockers').value = p.blockers;
+            if (p.targetDate) el.querySelector('#pf-date').value = p.targetDate;
             toast('Signals extracted from document!', 'success');
           } else {
             toast('No programs found in document', 'info');
@@ -1032,18 +1046,25 @@ function showProgramModal(program) {
   el.querySelector('#pf-save').onclick = () => {
     const name = el.querySelector('#pf-name').value.trim();
     if (!name) { toast('Program name is required', 'error'); return; }
+    
+    // Parse dependencies string to array
+    const depsRaw = el.querySelector('#pf-deps').value;
+    const dependencies = depsRaw.split(',').map(s => s.trim()).filter(s => !!s);
+
     const p = {
-      id:          program?.id || newProgramId(),
+      id:           program?.id || newProgramId(),
       name,
-      team:        el.querySelector('#pf-team').value.trim() || 'General',
-      quarter:     el.querySelector('#pf-quarter').value,
-      rag:         el.querySelector('#pf-rag').value,
-      milestone:   el.querySelector('#pf-milestone').value.trim(),
-      blockers:    el.querySelector('#pf-blockers').value.trim(),
-      decisions:   program?.decisions || '',
-      milestones:  program?.milestones || '',
-      emoji:       '📁',
-      lastUpdated: program?.lastUpdated || null
+      team:         el.querySelector('#pf-team').value.trim() || 'General',
+      quarter:      el.querySelector('#pf-quarter').value,
+      rag:          el.querySelector('#pf-rag').value,
+      milestone:    el.querySelector('#pf-milestone').value.trim(),
+      targetDate:   el.querySelector('#pf-date').value,
+      dependencies,
+      blockers:     el.querySelector('#pf-blockers').value.trim(),
+      decisions:    program?.decisions || '',
+      milestones:   program?.milestones || '',
+      emoji:        '📁',
+      lastUpdated:  program?.lastUpdated || null
     };
     saveProgram(p);
     close();
@@ -1054,9 +1075,228 @@ function showProgramModal(program) {
       renderGenerate();
       setTimeout(() => { const s = document.getElementById('gen-program'); if (s) s.value = p.id; }, 50);
     } else {
-      renderPrograms();
+      if (state.appPage === 'visuals') renderVisuals();
+      else if (state.appPage === 'programs') renderPrograms();
+      else renderPage(state.appPage);
     }
   };
+}
+
+// ── PORTFOLIO VISUALS ─────────────────────────────────────────────
+let activeVisualTab = 'timeline';
+
+function renderVisuals() {
+  const el = document.getElementById('apppage-visuals');
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-title">Strategic <em>Portfolio</em> Visuals</div>
+        <div class="page-subtitle">A high-level view of dependencies, timelines, and reporting across your portfolio.</div>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-secondary" onclick="window.print()">
+          ${ICONS.copy} PDF Export
+        </button>
+      </div>
+    </div>
+    
+    <div class="visuals-tabs mb-24">
+      <div class="v-tab ${activeVisualTab === 'timeline' ? 'active' : ''}" onclick="switchVisualTab('timeline')">Timeline (Gantt)</div>
+      <div class="v-tab ${activeVisualTab === 'mapper' ? 'active' : ''}" onclick="switchVisualTab('mapper')">Dependency Mapper</div>
+      <div class="v-tab ${activeVisualTab === 'mbr' ? 'active' : ''}" onclick="switchVisualTab('mbr')">MBR Report</div>
+    </div>
+
+    <div id="visuals-content"></div>
+  `;
+  renderVisualContent();
+}
+
+window.switchVisualTab = function(tab) {
+  activeVisualTab = tab;
+  renderVisuals();
+};
+
+function renderVisualContent() {
+  const container = document.getElementById('visuals-content');
+  if (activeVisualTab === 'timeline') renderPortfolioTimeline(container);
+  else if (activeVisualTab === 'mapper') renderDependencyMapper(container);
+  else if (activeVisualTab === 'mbr') renderMBRReport(container);
+}
+
+function renderPortfolioTimeline(container) {
+  const allPrograms = getPrograms();
+  const programs = allPrograms.filter(p => p.targetDate && p.targetDate !== '');
+  
+  if (programs.length === 0) {
+    container.innerHTML = `<div class="card"><div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">No dates defined</div><div class="empty-desc">Add "Target Completion Dates" to your programs to see them on the timeline.</div></div></div>`;
+    return;
+  }
+
+  // Calculate timeline range (6 months)
+  const now = new Date();
+  const months = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    months.push(d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
+  }
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endMonth = new Date(now.getFullYear(), now.getMonth() + 6, 0); // Last day of 6th month
+
+  container.innerHTML = `
+    <div class="card p-0 overflow-hidden">
+      <div class="gantt-grid">
+        <div class="gantt-header">
+          <div class="gantt-label-col">Program</div>
+          ${months.map(m => `<div class="gantt-month-col">${m}</div>`).join('')}
+        </div>
+        <div class="gantt-body">
+          ${programs.map(p => {
+            const tDate = new Date(p.targetDate);
+            const totalMs = endMonth - startMonth;
+            const posMs = tDate - startMonth;
+            const posPercent = Math.max(0, Math.min(100, (posMs / totalMs) * 100));
+            
+            return `
+              <div class="gantt-row">
+                <div class="gantt-label-col">
+                  <span class="rag-dot" style="background:var(--${p.rag})"></span>
+                  ${truncate(p.name, 35)}
+                </div>
+                <div class="gantt-track">
+                  <div class="gantt-bar-wrap" style="left: ${Math.max(0, posPercent - 20)}%; width: 20%;">
+                    <div class="gantt-bar ${p.rag}" title="Target: ${p.targetDate}">
+                      <span class="gantt-bar-label">${p.milestone || 'Target'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDependencyMapper(container) {
+  const programs = getPrograms();
+  const links = [];
+  programs.forEach(p => {
+    if (p.dependencies && p.dependencies.length > 0) {
+      p.dependencies.forEach(depId => {
+        const dep = getProgramById(depId);
+        if (dep) {
+          // Aggressive cleaning for Mermaid - strictly alphanumeric
+          const cleanDep = dep.name.replace(/[^a-zA-Z0-9 ]/g, " ").trim().slice(0, 25);
+          const cleanP = p.name.replace(/[^a-zA-Z0-9 ]/g, " ").trim().slice(0, 25);
+          links.push(`${dep.id}["${cleanDep}"] --> ${p.id}["${cleanP}"]`);
+        }
+      });
+    }
+  });
+
+  if (links.length === 0) {
+    container.innerHTML = `<div class="card"><div class="empty-state"><div class="empty-icon">🕸️</div><div class="empty-title">No dependencies</div><div class="empty-desc">Define dependencies in the "Add/Edit Program" modal to map them here.</div></div></div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="mermaid" id="mermaid-graph">
+        graph TD
+        ${links.join('\n')}
+        
+        %% Styles
+        classDef green fill:#D2F4E1,stroke:#52B788,stroke-width:1px,color:#0D1B2A;
+        classDef amber fill:#FFE8CC,stroke:#FFB347,stroke-width:1px,color:#0D1B2A;
+        classDef red fill:#FDE2E2,stroke:#C0392B,stroke-width:1px,color:#0D1B2A;
+        
+        ${programs.map(p => `class ${p.id} ${p.rag}`).join('\n')}
+      </div>
+    </div>
+  `;
+
+  if (window.mermaid) {
+    setTimeout(async () => {
+      try {
+        await window.mermaid.run({
+          nodes: [container.querySelector('.mermaid')]
+        });
+      } catch (e) {
+        console.error("Mermaid run failed", e);
+        // Fallback to legacy init if run fails
+        window.mermaid.init(undefined, container.querySelectorAll('.mermaid'));
+      }
+    }, 50);
+  }
+}
+
+function renderMBRReport(container) {
+  const programs = getPrograms();
+  const risks = getActiveRisks();
+  
+  container.innerHTML = `
+    <div class="mbr-container">
+      <div class="mbr-header">
+        <div class="mbr-title">Monthly Business Review (MBR)</div>
+        <div class="mbr-date">Portfolio Status &middot; ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
+      </div>
+
+      <div class="mbr-section">
+        <h3 class="mbr-h3">Portfolio Health Summary</h3>
+        <div class="metrics-grid mb-24">
+          <div class="metric-card">
+            <div class="metric-label">On Track</div>
+            <div class="metric-value" style="color:var(--success)">${programs.filter(p => p.rag==='green').length}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">At Watch</div>
+            <div class="metric-value" style="color:var(--warn)">${programs.filter(p => p.rag==='amber').length}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">At Risk</div>
+            <div class="metric-value" style="color:var(--danger)">${programs.filter(p => p.rag==='red').length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mbr-section">
+        <h3 class="mbr-h3">Program Deep-Dive</h3>
+        <table class="mbr-table">
+          <thead>
+            <tr>
+              <th>Program</th>
+              <th>Status</th>
+              <th>Top Risk / Blocker</th>
+              <th>Next Milestone</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${programs.map(p => `
+              <tr>
+                <td class="font-500">${p.name}</td>
+                <td>${ragBadge(p.rag)}</td>
+                <td class="text-xs color-muted">${truncate(p.blockers || 'None reported', 120)}</td>
+                <td class="text-xs font-500">${p.milestone || 'TBD'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mbr-section mt-24">
+        <h3 class="mbr-h3">Critical Portfolio Risks</h3>
+        ${risks.length === 0 ? '<p class="text-xs color-muted">No high-severity risks identified.</p>' : 
+          risks.map(r => `
+            <div class="mbr-risk-item mb-8">
+              <div class="mbr-risk-title ${r.severity}">${r.programName}: ${r.title}</div>
+              <div class="mbr-risk-desc">${r.description}</div>
+            </div>
+          `).join('')
+        }
+      </div>
+    </div>
+  `;
 }
 
 function renderBulkReview(programs, modalEl, close) {

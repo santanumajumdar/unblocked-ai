@@ -659,6 +659,65 @@ select {
 .insight-label { font-size: 12px; font-weight: 500; color: var(--warn); display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
 .insight-body { font-size: 12.5px; color: var(--text-secondary); line-height: 1.55; }
 
+/* ── VISUALS PAGE ───────────────────────────────────────── */
+.visuals-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+.v-tab {
+  padding: 8px 16px; font-size: 13.5px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;
+}
+.v-tab:hover { color: var(--text-primary); }
+.v-tab.active { color: var(--accent-light); border-bottom-color: var(--accent-light); }
+
+/* ── GANTT CHART ────────────────────────────────────────── */
+.gantt-grid { font-size: 12.5px; }
+.gantt-header { display: flex; border-bottom: 1px solid var(--border); background: var(--surface-dim); }
+.gantt-label-col { width: 220px; padding: 12px 16px; border-right: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+.gantt-month-col { flex: 1; text-align: center; padding: 12px 4px; border-right: 1px solid var(--border); font-weight: 500; font-size: 11px; color: var(--text-muted); }
+.gantt-month-col:last-child { border-right: none; }
+
+.gantt-row { display: flex; border-bottom: 1px solid var(--border-light); height: 52px; align-items: stretch; }
+.gantt-track { flex: 1; position: relative; background-image: repeating-linear-gradient(90deg, transparent, transparent calc(16.66% - 1px), var(--border) calc(16.66% - 1px), var(--border) 16.66%); }
+.gantt-bar-wrap { position: absolute; top: 11px; height: 30px; transition: all 0.3s ease; }
+.gantt-bar {
+  height: 100%; border-radius: 6px; display: flex; align-items: center; padding: 0 10px;
+  font-size: 11px; font-weight: 600; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gantt-bar.green { background: linear-gradient(135deg, #2D6A4F, #52B788); border: 1px solid #74C69D; }
+.gantt-bar.amber { background: linear-gradient(135deg, #B5651D, #FFB347); border: 1px solid #FFCD91; }
+.gantt-bar.red   { background: linear-gradient(135deg, #7B241C, #C0392B); border: 1px solid #E74C3C; }
+.gantt-bar-label { text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+
+/* ── MERMAID ────────────────────────────────────────────── */
+.mermaid { background: var(--surface-dim); border-radius: var(--radius); padding: 20px; display: flex; justify-content: center; min-height: 400px; }
+
+/* ── MBR REPORT ───────────────────────────────────────────── */
+.mbr-container { background: white; color: #0D1B2A; padding: 40px; border-radius: var(--radius-sm); font-family: 'Inter', sans-serif; box-shadow: var(--shadow-md); }
+.mbr-header { border-bottom: 2px solid #0D1B2A; padding-bottom: 12px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: baseline; }
+.mbr-title { font-family: var(--font-heading); font-size: 26px; font-weight: 300; letter-spacing: -0.5px; }
+.mbr-date { font-size: 14px; font-weight: 600; opacity: 0.6; }
+.mbr-h3 { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; border-bottom: 1px solid #EEE; padding-bottom: 6px; }
+.mbr-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+.mbr-table th { text-align: left; font-size: 12px; font-weight: 700; color: #666; padding: 10px; border-bottom: 1px solid #DDD; }
+.mbr-table td { padding: 14px 10px; border-bottom: 1px solid #F5F5F5; font-size: 13.5px; vertical-align: top; }
+.mbr-risk-item { padding: 10px 14px; border-left: 3px solid #EEE; background: #F9FAFB; border-radius: 0 4px 4px 0; }
+.mbr-risk-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.mbr-risk-title.high { color: #C0392B; }
+.mbr-risk-title.medium { color: #B5651D; }
+.mbr-risk-desc { font-size: 12px; color: #555; line-height: 1.5; }
+
+/* ── PRINT ──────────────────────────────────────────────── */
+@media print {
+  .sidebar, .page-header, .visuals-tabs, .btn, .nav-pill { display: none !important; }
+  body { background: white !important; padding: 0 !important; }
+  .page-body { padding: 0 !important; margin: 0 !important; }
+  .layout-shell { display: block !important; }
+  .main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  .card, .mbr-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+  #apppage-visuals, #visuals-content { display: block !important; }
+  @page { margin: 2cm; }
+}
+
 /* ── RESPONSIVE ─────────────────────────────────────────── */
 @media (max-width: 960px) {
   .sidebar { width: 190px; }
