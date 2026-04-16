@@ -5,6 +5,7 @@
 const PROGRAMS_KEY = 'unblocked_programs';
 const HISTORY_KEY  = 'unblocked_history';
 const RISKS_KEY    = 'unblocked_risks';
+const DECISIONS_KEY = 'unblocked_decisions';
 
 // ── DEFAULT SEED DATA ────────────────────────────────────────────
 const DEFAULT_PROGRAMS = [
@@ -168,6 +169,39 @@ const DEFAULT_RISKS = [
   }
 ];
 
+const DEFAULT_DECISIONS = [
+  {
+    id: 'dec_1',
+    programId: 'prog_3',
+    programName: 'Nexus — Developer Platform Reboot',
+    title: 'Descope mobile SDK support to Q3',
+    rationale: 'Strategic pivot to stabilize core web infra first. Headcount for contractors approved instead of immediate SDK push.',
+    dri: 'VP of Engineering',
+    date: '2026-04-12',
+    createdAt: Date.now() - 4 * 86400000
+  },
+  {
+    id: 'dec_2',
+    programId: 'prog_5',
+    programName: 'Pulse — Real-Time Observability',
+    title: 'Adopt OpenTelemetry as observability standard',
+    rationale: 'Avoid vendor lock-in and enable cross-provider flexibility for future-proofing.',
+    dri: 'SRE Lead',
+    date: '2026-04-10',
+    createdAt: Date.now() - 6 * 86400000
+  },
+  {
+    id: 'dec_3',
+    programId: 'prog_2',
+    programName: 'Meridian — Data Governance Framework',
+    title: 'Phased rollout strategy for Data Retention',
+    rationale: 'Legal recommended Tier 1 data focus for initial compliance milestone.',
+    dri: 'CLO Office',
+    date: '2026-04-05',
+    createdAt: Date.now() - 11 * 86400000
+  }
+];
+
 // ── PROGRAMS ─────────────────────────────────────────────────────
 export function getPrograms() {
   try {
@@ -265,6 +299,45 @@ export function dismissRisk(id) {
 
 export function getActiveRisks() {
   return getRisks().filter(r => !r.acknowledged);
+}
+
+// ── DECISIONS ─────────────────────────────────────────────────────
+export function getDecisions() {
+  try {
+    const raw = localStorage.getItem(DECISIONS_KEY);
+    return raw ? JSON.parse(raw) : initDecisions();
+  } catch { return initDecisions(); }
+}
+
+function initDecisions() {
+  localStorage.setItem(DECISIONS_KEY, JSON.stringify(DEFAULT_DECISIONS));
+  return DEFAULT_DECISIONS;
+}
+
+export function saveDecision(decision) {
+  const decisions = getDecisions();
+  const idx = decisions.findIndex(d => d.id === decision.id);
+  
+  const d = {
+    ...decision,
+    id: decision.id || 'dec_' + Date.now(),
+    createdAt: decision.createdAt || Date.now()
+  };
+
+  if (idx > -1) decisions[idx] = d;
+  else decisions.push(d);
+  
+  localStorage.setItem(DECISIONS_KEY, JSON.stringify(decisions));
+  return d;
+}
+
+export function deleteDecision(id) {
+  const decisions = getDecisions().filter(d => d.id !== id);
+  localStorage.setItem(DECISIONS_KEY, JSON.stringify(decisions));
+}
+
+export function getDecisionsByProgram(programId) {
+  return getDecisions().filter(d => d.programId === programId);
 }
 
 // ── MONITORING & CROSS-PROGRAM INSIGHTS ────────────────────────────

@@ -114,6 +114,13 @@ export async function extractProgramSignals(text, onDone, onError) {
           milestone: "August 5",
           blockers: "No critical blockers."
         }
+      ],
+      decisions: [
+        {
+          title: "Descope mobile SDK for Q2",
+          rationale: "Stabilize core web infra first.",
+          dri: "Engineering Lead"
+        }
       ]
     });
     return;
@@ -132,6 +139,13 @@ Return the data in this exact format:
       "rag": "green|amber|red",
       "milestone": "Date",
       "blockers": "Text"
+    }
+  ],
+  "decisions": [
+    {
+      "title": "Short title of decision",
+      "rationale": "Why this was decided",
+      "dri": "Person responsible"
     }
   ]
 }

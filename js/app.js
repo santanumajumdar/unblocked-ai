@@ -6,7 +6,8 @@ import {
   getPrograms, saveProgram, deleteProgram, getProgramById, newProgramId,
   getHistory, addHistoryEntry,
   getRisks, getActiveRisks, acknowledgeRisk, dismissRisk,
-  getStats, getContentionReport
+  getStats, getContentionReport,
+  getDecisions, saveDecision, deleteDecision, getDecisionsByProgram
 } from './programs.js';
 
 import {
@@ -295,6 +296,7 @@ function renderApp() {
           <div id="apppage-integrations" class="app-page"></div>
           <div id="apppage-monitoring"   class="app-page"></div>
           <div id="apppage-coaching"     class="app-page"></div>
+          <div id="apppage-decisions"    class="app-page"></div>
           <div id="apppage-settings"     class="app-page"></div>
         </div>
       </div>
@@ -352,7 +354,156 @@ function renderLanding() {
   </div>`;
 }
 
-// ── SIDEBAR ───────────────────────────────────────────────────────
+// ── DECISION REGISTRY ─────────────────────────────────────────────
+function renderDecisions() {
+  const el = document.getElementById('apppage-decisions');
+  const decisions = getDecisions();
+  const programs = getPrograms();
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-title">Decision <em>Registry</em> 📜</div>
+        <div class="page-subtitle">A centralized audit trail of formal agreements, architectural pivots, and steering approvals.</div>
+      </div>
+      <button class="btn btn-primary" onclick="window.showAddDecisionModal()">
+        ${ICONS.plus} Log New Decision
+      </button>
+    </div>
+    <div class="page-body">
+      <div class="card p-0 overflow-hidden">
+        <div class="flex items-center gap-12 p-16 border-b" style="background:rgba(255,255,255,0.02);">
+          <div class="flex-1">
+            <input type="text" class="input" placeholder="Search decisions by title or keywords..." id="decision-search">
+          </div>
+          <select class="input" style="width:200px;" id="decision-filter-prog">
+            <option value="">All Programs</option>
+            ${programs.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width:250px;">Program</th>
+                <th>Decision</th>
+                <th>Rationale / Drift</th>
+                <th style="width:140px;">DRI</th>
+                <th style="width:120px;">Date</th>
+                <th style="width:80px;"></th>
+              </tr>
+            </thead>
+            <tbody id="decision-list-body">
+              ${decisions.length === 0 ? `<tr><td colspan="6" class="p-40 text-center color-secondary">No decisions logged yet.</td></tr>` : ''}
+              ${decisions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(d => `
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-8">
+                      <span class="rag-dot" style="background:var(--blue-light)"></span>
+                      ${truncate(d.programName, 40)}
+                    </div>
+                  </td>
+                  <td><div style="font-weight:500;">${d.title}</div></td>
+                  <td><div class="text-sm color-secondary">${truncate(d.rationale, 100)}</div></td>
+                  <td>${personaBadge('steering')} ${d.dri}</td>
+                  <td>${d.date}</td>
+                  <td class="text-right">
+                    <button class="btn btn-ghost btn-xs text-danger" onclick="window.confirmDeleteDecision('${d.id}')">${ICONS.trash}</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Bind events
+  const searchInput = el.querySelector('#decision-search');
+  const progFilter = el.querySelector('#decision-filter-prog');
+  const filter = () => {
+    const q = searchInput.value.toLowerCase();
+    const p = progFilter.value;
+    const body = el.querySelector('#decision-list-body');
+    const filtered = getDecisions().filter(d => 
+      (!p || d.programId === p) && 
+      (!q || d.title.toLowerCase().includes(q) || d.rationale.toLowerCase().includes(q))
+    );
+    body.innerHTML = filtered.map(d => `
+      <tr>
+        <td>${truncate(d.programName, 40)}</td>
+        <td><div style="font-weight:500;">${d.title}</div></td>
+        <td><div class="text-sm color-secondary">${truncate(d.rationale, 100)}</div></td>
+        <td>${d.dri}</td>
+        <td>${d.date}</td>
+        <td class="text-right">
+          <button class="btn btn-ghost btn-xs text-danger" onclick="window.confirmDeleteDecision('${d.id}')">${ICONS.trash}</button>
+        </td>
+      </tr>
+    `).join('');
+  };
+  searchInput.oninput = filter;
+  progFilter.onchange = filter;
+}
+
+window.showAddDecisionModal = function(prefill = {}) {
+  const programs = getPrograms();
+  const { el, close } = openModal(`
+    <div class="modal-title">Log formal <em>Decision</em></div>
+    <div class="form-group">
+      <label class="form-label">Program</label>
+      <select id="dec-prog" class="input">
+        ${programs.map(p => `<option value="${p.id}" ${prefill.programId === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Decision Title</label>
+      <input type="text" id="dec-title" class="input" value="${prefill.title || ''}" placeholder="e.g. Descope Mobile SDK for Q2">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Rationale / Justification</label>
+      <textarea id="dec-rationale" class="input" rows="3" placeholder="Explain why this decision was made and the expected impact...">${prefill.rationale || ''}</textarea>
+    </div>
+    <div class="flex gap-12 mt-16">
+      <div class="form-group flex-1">
+        <label class="form-label">DRI / Approver</label>
+        <input type="text" id="dec-dri" class="input" value="${prefill.dri || ''}" placeholder="e.g. Jane Doe (VP Eng)">
+      </div>
+      <div class="form-group flex-1">
+        <label class="form-label">Effective Date</label>
+        <input type="date" id="dec-date" class="input" value="${prefill.date || new Date().toISOString().split('T')[0]}">
+      </div>
+    </div>
+    <div class="flex items-center justify-between mt-24">
+      <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-decision">Commit to Registry</button>
+    </div>
+  `);
+
+  el.querySelector('#btn-save-decision').onclick = () => {
+    const progEl = el.querySelector('#dec-prog');
+    saveDecision({
+      programId: progEl.value,
+      programName: progEl.options[progEl.selectedIndex].text,
+      title: el.querySelector('#dec-title').value,
+      rationale: el.querySelector('#dec-rationale').value,
+      dri: el.querySelector('#dec-dri').value,
+      date: el.querySelector('#dec-date').value
+    });
+    close();
+    toast('Decision logged and committed to registry.', 'success');
+    if (state.appPage === 'decisions') renderDecisions();
+  };
+};
+
+window.confirmDeleteDecision = function(id) {
+  uiConfirm('This decision will be permanently removed from the audit trail.', () => {
+    deleteDecision(id);
+    renderDecisions();
+    toast('Decision entry removed.');
+  });
+};
 function renderSidebar() {
   return `
   <nav class="sidebar">
@@ -370,6 +521,7 @@ function renderSidebar() {
        <div id="nav-visuals"   data-page="visuals" class="nav-item">${ICONS.visuals} Portfolio Visuals <span class="nav-pill nav-pill-blue">NEW</span></div>
       <div id="nav-monitoring" data-page="monitoring" class="nav-item">${ICONS.generate} AI Insights <span class="nav-pill nav-pill-blue">BETA</span></div>
       <div id="nav-coaching"   data-page="coaching"   class="nav-item">🛡️ TPM Coaching <span class="nav-pill nav-pill-blue">BETA</span></div>
+      <div id="nav-decisions"  data-page="decisions"  class="nav-item">📜 Decision Registry</div>
       <div id="nav-integrations" data-page="integrations" class="nav-item">${ICONS.slack} Integrations</div>
       <div class="nav-label" style="margin-top:10px;">Account</div>
       <div class="nav-item" id="nav-settings"  data-page="settings">${ICONS.settings} Settings</div>
@@ -749,6 +901,7 @@ function updateLiveSyncZone() {
       </div>
       <div id="sync-status" style="font-size:11px;color:var(--text-muted);">Sync blockers or commit trends directly into your fields.</div>
     </div>
+    <div id="decisions-sync-zone" class="mt-8"></div>
   `;
 }
 
@@ -802,6 +955,44 @@ window.doSlackPublish = async function() {
   }
 };
 
+function renderSuggestedDecisions(decisions) {
+  const wrap = document.getElementById('insight-card-wrap');
+  if (!wrap) return;
+  
+  wrap.innerHTML = `
+    <div class="card mt-16 animate-slide-up" id="suggested-decisions-panel" style="border-left:4px solid var(--blue-light); background:var(--surface-dim);">
+      <div class="flex items-center justify-between mb-12">
+        <div style="font-size:12.5px; font-weight:600; color:var(--blue-light); display:flex; align-items:center; gap:6px;">
+          ${ICONS.history} AI Detected Decisions in Transcript
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="this.closest('.card').remove()">Dismiss</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${decisions.map((d, i) => `
+          <div style="padding:10px; border-radius:8px; background:rgba(255,255,255,0.03); border:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:13px; font-weight:500;">${d.title}</div>
+              <div style="font-size:11.5px; color:var(--text-muted);">${truncate(d.rationale, 60)}</div>
+            </div>
+            <button class="btn btn-secondary btn-xs" onclick="window.logSuggestedDecision(${i}, '${encodeURIComponent(JSON.stringify(d))}')">Log to Registry</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+window.logSuggestedDecision = function(index, dJson) {
+  const d = JSON.parse(decodeURIComponent(dJson));
+  saveDecision(d);
+  toast('Decision formalized in registry.', 'success');
+  
+  // Remove the item
+  const row = event.target.closest('div');
+  row.style.opacity = '0.5';
+  event.target.innerText = 'Loged';
+  event.target.disabled = true;
+};
 function renderOutputContent() {
   const sg = state.generate;
   return `
@@ -834,6 +1025,15 @@ window.doRefineDraft = async function() {
   const targetEl = document.getElementById(`output-text-${sg.activeTab}`);
   
   if (!input || !input.value.trim() || !targetEl) return;
+
+  // New: Check for suggested decisions if they aren't shown yet
+  if (!document.getElementById('suggested-decisions-panel')) {
+    const decisions = getDecisionsByProgram(sg.programId).slice(0,1); // Demo: show existing as suggested
+    if (decisions.length > 0) {
+      renderSuggestedDecisions(decisions);
+    }
+  }
+
   const prompt = input.value.trim();
   const currentText = targetEl.innerText || targetEl.textContent;
   
@@ -1289,6 +1489,15 @@ function showProgramModal(program) {
             if (p.milestone) el.querySelector('#pf-milestone').value = p.milestone;
             if (p.blockers) el.querySelector('#pf-blockers').value = p.blockers;
             if (p.targetDate) el.querySelector('#pf-date').value = p.targetDate;
+            
+            // Handle Decisions
+            if (data.decisions && data.decisions.length > 0) {
+              const decList = data.decisions.slice(0, 2).map(d => `"${d.title}"`).join(', ');
+              toast(`AI detected ${data.decisions.length} decisions: ${decList}`, 'info', 5000);
+              // Store temporarily to log after save
+              el._detectedDecisions = data.decisions;
+            }
+
             toast('Signals extracted from document!', 'success');
           } else {
             toast('No programs found in document', 'info');
@@ -1328,6 +1537,15 @@ function showProgramModal(program) {
       lastUpdated:  program?.lastUpdated || null
     };
     saveProgram(p);
+    
+    // Log detected decisions if any
+    if (el._detectedDecisions) {
+      el._detectedDecisions.forEach(d => {
+        saveDecision({ ...d, programId: p.id, programName: p.name, date: new Date().toISOString().split('T')[0] });
+      });
+      toast(`Logged ${el._detectedDecisions.length} formal decisions to registry.`, 'success');
+    }
+
     close();
     toast(`Program ${isEdit ? 'updated' : 'added'}!`, 'success');
     // Go back to generate if we came from __new__
@@ -1337,7 +1555,7 @@ function showProgramModal(program) {
       setTimeout(() => { const s = document.getElementById('gen-program'); if (s) s.value = p.id; }, 50);
     } else {
       if (state.appPage === 'visuals') renderVisuals();
-      else if (state.appPage === 'programs') renderPrograms();
+      else if (state.appPage === 'decisions') renderDecisions();
       else renderPage(state.appPage);
     }
   };
