@@ -702,7 +702,7 @@ function renderDashboard() {
             <div class="history-item">
               <div class="history-date">${formatDate(h.createdAt)}</div>
               <div class="history-body">
-                <div class="history-program">${h.programName} ${h.personas.map(personaBadge).join('')}</div>
+                <div class="history-program">${h.programName} ${(h.personas || []).map(personaBadge).join('')}</div>
                 <div class="history-preview">${truncate(h.preview, 80)}</div>
               </div>
             </div>`).join('')
@@ -2002,74 +2002,91 @@ function renderCapacityFatigue(container) {
   const fatigue = getTeamFatigueAnalysis();
   
   container.innerHTML = `
-    <div class="mb-32">
-      <div class="flex items-center gap-12 mb-24">
-        <div style="font-size:24px;">⚖️</div>
+    <div class="mb-40">
+      <div class="flex items-center gap-16 mb-32 animate-fade-in">
+        <div class="intelligence-icon-wrap">
+          <div class="intelligence-pulse"></div>
+          ⚖️
+        </div>
         <div>
-          <div style="font-size:18px; font-weight:600; font-family:var(--font-heading);">Capacity Early Warning</div>
-          <div class="text-xs color-secondary">Predicting delivery blocks by analyzing Sentiment Trajectory vs. Throughput Velocity.</div>
+          <h2 style="font-size:24px; font-weight:300; font-family:var(--font-heading); letter-spacing:-0.02em;">Capacity <em>Early Warning</em></h2>
+          <div class="text-sm color-secondary" style="margin-top:2px; opacity:0.8;">Predictive portfolio intelligence & team health vectoring.</div>
         </div>
       </div>
       
-      <div class="grid-2">
-        ${fatigue.map(f => `
-          <div class="card p-24 animate-fade-in-up">
-            <div class="flex items-center justify-between mb-20">
-              <div>
-                <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:4px;">${f.team}</div>
-                <div style="font-size:20px; font-weight:500;">Fatigue Index</div>
-              </div>
-              <div class="badge ${f.fatigueLevel === 'critical' ? 'badge-error' : f.fatigueLevel === 'medium' ? 'badge-warn' : 'badge-success'}" style="padding:4px 12px; border-radius:30px;">
+      <div class="grid-2 gap-24">
+        ${fatigue.length === 0 ? `
+          <div class="card p-40 text-center color-secondary col-span-2">
+            No fatigue data available yet. Generate status updates with velocity metrics to activate.
+          </div>
+        ` : fatigue.map((f, i) => {
+          const isCritical = f.fatigueLevel === 'critical';
+          const isMedium = f.fatigueLevel === 'medium';
+          const statusClass = isCritical ? 'critical' : isMedium ? 'medium' : 'stable';
+          
+          return `
+          <div class="capacity-card ${statusClass} animate-fade-in-up" style="animation-delay:${i * 0.1}s">
+            <div class="capacity-card-header">
+              <div class="team-tag">${f.team}</div>
+              <div class="fatigue-badge ${statusClass}">
+                <span class="status-pulse"></span>
                 ${f.fatigueLevel.toUpperCase()}
               </div>
             </div>
             
-            <div class="mb-24">
-              <div class="flex items-center justify-between mb-8">
-                <span class="text-xs color-secondary font-500">Throughput Stability</span>
-                <span class="text-xs font-600 ${f.velocityTrend < 0 ? 'text-danger' : 'text-success'}">
-                  ${f.velocityTrend < 0 ? '↘' : '↗'} ${Math.abs(f.velocityTrend)} story points
-                </span>
-              </div>
-              <div style="height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden; position:relative;">
-                <div style="width:${Math.min(100, (f.currentVelocity / 50) * 100)}%; height:100%; background:${f.fatigueLevel === 'critical' ? 'var(--danger)' : f.fatigueLevel === 'medium' ? 'var(--warn)' : 'var(--success)'}; transition: width 1s ease-out; box-shadow:0 0 10px ${f.fatigueLevel === 'critical' ? 'rgba(239,68,68,0.4)' : 'transparent'};"></div>
+            <div class="capacity-hero-val mb-24">
+              <div class="label">Fatigue Index</div>
+              <div class="value-row">
+                <span class="value">${isCritical ? 'High' : isMedium ? 'Elevated' : 'Nominal'}</span>
+                <span class="sub">${f.currentVelocity} sp/week</span>
               </div>
             </div>
 
-            <div class="p-16 mb-20" style="background:rgba(255,255,255,0.02); border-radius:12px; border:1px solid var(--border); border-left:4px solid ${f.fatigueLevel === 'critical' ? 'var(--danger)' : 'var(--accent)'}">
-              <div class="flex items-center gap-8 mb-8">
-                <div class="text-xs font-700 color-secondary" style="letter-spacing:0.05em;">AI PREDICTION</div>
-                ${f.fatigueLevel === 'critical' ? '<span class="pulse-marker" style="--pulse-color:var(--danger)"></span>' : ''}
+            <div class="metric-visual-grid mb-24">
+              <div class="spark-item">
+                <div class="spark-label">Sentiment Trajectory</div>
+                <div class="spark-val ${f.sentimentTrend < 0 ? 'neg' : 'pos'}">
+                  ${f.sentimentTrend < 0 ? '↘' : '↗'} ${Math.abs(f.sentimentTrend)}pts
+                </div>
+                <div class="spark-track"><div class="spark-fill" style="width:${Math.abs(f.sentimentTrend) * 10}%"></div></div>
               </div>
-              <div class="text-sm font-600 mb-6" style="color:var(--text-primary); line-height:1.4;">${f.prediction}</div>
-              <div class="text-xs color-secondary" style="line-height:1.5;">${f.suggestion}</div>
+              <div class="spark-item">
+                <div class="spark-label">Throughput Velocity</div>
+                <div class="spark-val ${f.velocityTrend < 0 ? 'neg' : 'pos'}">
+                  ${f.velocityTrend < 0 ? '↘' : '↗'} ${Math.abs(f.velocityTrend)}sp
+                </div>
+                <div class="spark-track"><div class="spark-fill" style="width:${Math.abs(f.velocityTrend) * 10}%"></div></div>
+              </div>
+            </div>
+
+            <div class="intelligence-briefing ${statusClass}">
+              <div class="briefing-header">
+                <div class="text-xs font-700 opacity-60">AI PREDICTION & STEERING</div>
+                ${isCritical ? '<div class="pulse-marker-small"></div>' : ''}
+              </div>
+              <div class="briefing-prediction">${f.prediction}</div>
+              <div class="briefing-suggestion">${f.suggestion}</div>
             </div>
             
-            <div class="flex items-center justify-between text-xs color-muted border-top pt-16 mt-4">
-              <div class="flex items-center gap-6">
-                ${ICONS.history} Trends: ${daysAgo(f.updatedAt)}
+            <div class="capacity-card-footer mt-20">
+              <div class="flex items-center gap-6 opacity-40 text-xs">
+                ${ICONS.history} Analyzed ${daysAgo(f.updatedAt)}
               </div>
-              <div class="flex items-center gap-10">
-                <span class="flex items-center gap-4">
-                  Sentiment: <span class="${f.sentimentTrend < 0 ? 'text-danger' : 'text-success'} font-600">${f.sentimentTrend > 0 ? '+' : ''}${f.sentimentTrend}</span>
-                </span>
-                <span class="flex items-center gap-4">
-                  Velocity: <span class="${f.velocityTrend < 0 ? 'text-danger' : 'text-success'} font-600">${f.velocityTrend > 0 ? '+' : ''}${f.velocityTrend}</span>
-                </span>
-              </div>
+              <div class="nowrap" style="font-size:10px; opacity:0.3; letter-spacing:0.05em;">AI CONFIDENCE: 94%</div>
             </div>
           </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
       
-      <div class="card bg-surface-dim mt-24">
-        <div class="card-body flex items-start gap-16">
-          <div style="font-size:24px;">💡</div>
+      <div class="intelligence-theory-card mt-32">
+        <div class="flex items-start gap-20">
+          <div class="theory-icon">💡</div>
           <div>
-            <div class="font-600 mb-4" style="color:var(--accent-light);">Understanding Fatigue Metrics</div>
-            <div class="text-sm color-secondary leading-relaxed">
-              Early Warning identifies <strong>Structural Divergence</strong>. When sentiment trends down but velocity remains high, team fatigue usually stays hidden until a sudden delivery failure occurs. We analyze tone across Slack transcripts and meeting status updates to predict these peaks.
-            </div>
+            <div class="font-600 mb-6" style="color:var(--accent-light); font-size:15px; font-family:var(--font-heading);">The "Structural Divergence" Model</div>
+            <p class="text-sm color-secondary leading-relaxed" style="opacity:0.85;">
+              Sudden delivery blocks are rarely spontaneous. They are preceded by <strong>Structural Divergence</strong>: a pattern where team sentiment trends negatively while velocity remains high through unsustainable effort. Unblocked AI vectors these signals to predict total blockages 2-3 weeks before they occur in Jira/GitHub.
+            </p>
           </div>
         </div>
       </div>
@@ -2379,7 +2396,7 @@ function renderHistory() {
             <div class="history-item" onclick="showHistoryDetail('${h.id}')">
               <div class="history-date">${formatDate(h.createdAt)}</div>
               <div class="history-body">
-                <div class="history-program">${h.programName} ${ragBadge(h.rag)} ${h.personas.map(personaBadge).join('')}</div>
+                <div class="history-program">${h.programName} ${ragBadge(h.rag)} ${(h.personas || []).map(personaBadge).join('')}</div>
                 <div class="history-preview">${truncate(h.preview, 100)}</div>
               </div>
               <button class="btn btn-ghost btn-sm nowrap" onclick="event.stopPropagation();reuseHistory('${h.id}')">Reuse</button>

@@ -108,6 +108,7 @@ const DEFAULT_HISTORY = [
     sentimentLabel: 'Urgent',
     velocity: 28, // Dropping from 40
     preview: 'Critical blocker on CI/CD. Team working overtime.',
+    personas: ['exec', 'pm'],
     createdAt: Date.now() - 1 * 86400000
   },
   {
@@ -119,6 +120,7 @@ const DEFAULT_HISTORY = [
     sentimentLabel: 'Concerned',
     velocity: 34,
     preview: 'Observing delays in infra-as-code migration.',
+    personas: ['exec'],
     createdAt: Date.now() - 8 * 86400000
   },
   {
@@ -130,6 +132,7 @@ const DEFAULT_HISTORY = [
     sentimentLabel: 'Stable',
     velocity: 40,
     preview: 'Phase 1 complete. Steady progress.',
+    personas: ['exec', 'eng'],
     createdAt: Date.now() - 15 * 86400000
   },
   // Data Team - Scenario: Over-indexed (High Input + Flat Velocity)
@@ -142,6 +145,7 @@ const DEFAULT_HISTORY = [
     sentimentLabel: 'Strained',
     velocity: 22,
     preview: 'Legal review delay. Backlog growing.',
+    personas: ['exec', 'steering'],
     createdAt: Date.now() - 2 * 86400000
   },
   {
@@ -153,6 +157,7 @@ const DEFAULT_HISTORY = [
     sentimentLabel: 'Active',
     velocity: 23,
     preview: 'Initial schemas approved.',
+    personas: ['exec', 'pm'],
     createdAt: Date.now() - 9 * 86400000
   },
   // Infrastructure - Scenario: Healthy
@@ -165,6 +170,7 @@ const DEFAULT_HISTORY = [
     sentimentLabel: 'Confident',
     velocity: 45,
     preview: 'Rollout trending ahead of schedule.',
+    personas: ['exec', 'eng'],
     createdAt: Date.now() - 3 * 86400000
   }
 ];
