@@ -1329,9 +1329,14 @@ function renderPrograms() {
         <div class="page-title">My <em>Programs</em></div>
         <div class="page-subtitle">${programs.length} active programs in your portfolio.</div>
       </div>
-      <button class="btn btn-primary" onclick="showAddProgramModal()">
-        ${ICONS.plus} Add program
-      </button>
+      <div class="flex gap-12">
+        <button class="btn btn-secondary" onclick="showBulkImportModal()">
+          ${ICONS.upload} Bulk import
+        </button>
+        <button class="btn btn-primary" onclick="showAddProgramModal()">
+          ${ICONS.plus} Add program
+        </button>
+      </div>
     </div>
     <div class="page-body">
       <div class="card">

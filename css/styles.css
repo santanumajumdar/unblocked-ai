@@ -1237,3 +1237,62 @@ select {
 }
 @keyframes beacon { 0% { opacity: 0.8; transform: scale(0.95); } 100% { opacity: 0; transform: scale(1.15); } }
 
+
+/* ── BULK IMPORT OVERLAY ────────────────────────────── */
+.bulk-preview-container {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin: 16px 0;
+  background: var(--onyx-deep);
+}
+.bulk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+.bulk-table th {
+  position: sticky; top: 0;
+  background: var(--surface-raised);
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  z-index: 10;
+}
+.bulk-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bulk-table tr:hover { background: rgba(255,255,255,0.02); }
+
+.bulk-count-badge {
+  background: var(--accent-glow);
+  color: var(--accent-light);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  text-align: center;
+  transition: var(--transition);
+  cursor: pointer;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.drop-zone svg { width: 32px; height: 32px; color: var(--text-muted); margin-bottom: 12px; }
+

@@ -65,6 +65,16 @@ async function parseExcel(file) {
   return fullText;
 }
 
+/**
+ * parseExcelToJSON — Returns raw JSON objects for bulk import
+ */
+export async function parseExcelToJSON(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+  return window.XLSX.utils.sheet_to_json(firstSheet);
+}
+
 async function parseWord(file) {
   const arrayBuffer = await file.arrayBuffer();
   const result = await window.mammoth.extractRawText({ arrayBuffer });
