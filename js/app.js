@@ -27,6 +27,9 @@ import {
 
 import { renderCoaching, isWatermelon } from './productivity.js';
 import { getStrategicPillars, saveStrategicPillars, calculateAlignmentScore } from './strategy.js';
+import { 
+  initSandbox, resetSandbox, isSandboxActive, simulateSlip, getSimulatedPrograms, getSimulationImpact 
+} from './sandbox.js';
 import {
   toast, openModal, confirm as uiConfirm, copyText,
   formatDate, daysAgo, ragBadge, ragEmoji, ragLabel,
@@ -256,6 +259,7 @@ function showSupabaseConfigModal() {
 
 // ── RENDER APP SHELL ──────────────────────────────────────────────
 function renderApp() {
+  const sandbox = isSandboxActive();
   document.getElementById('app').innerHTML = `
     <!-- LANDING PAGE -->
     <div id="page-landing" class="page active">
@@ -264,6 +268,21 @@ function renderApp() {
 
     <!-- APP SHELL -->
     <div id="page-app" class="page">
+      ${sandbox ? `
+        <div class="sandbox-banner animate-slide-down" style="background:var(--warn-bg); border-bottom:1px solid var(--warn-border); padding:10px 24px; display:flex; justify-content:space-between; align-items:center; z-index:100; position:relative;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="pulse-row" style="background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:12px; border:1px solid var(--warn-border);">
+              <div class="pulse-dot" style="background:var(--warn)"></div>
+              <span style="font-weight:600; font-size:12px; letter-spacing:0.5px; color:var(--warn);">SANDBOX ACTIVE</span>
+            </div>
+            <span style="font-size:13px; color:var(--text-secondary);">Modeling "What-IF" scenarios &middot; Live data is safe</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="window.doResetSandbox()">Reset</button>
+            <button class="btn btn-primary btn-sm" onclick="window.exitSandbox()">Exit Sandbox</button>
+          </div>
+        </div>
+      ` : ''}
       <div class="layout-shell">
         ${renderSidebar()}
         <div class="main-content" id="main-content">
@@ -379,7 +398,7 @@ function updateRiskBadge() {
 function renderDashboard() {
   updateRiskBadge();
   const stats = getStats();
-  const programs = getPrograms();
+  const programs = getSimulatedPrograms(getPrograms());
   const history = getHistory().slice(0, 3);
   const risks = getActiveRisks().slice(0, 3);
 
@@ -537,7 +556,7 @@ function renderDashboard() {
 // ── GENERATE ──────────────────────────────────────────────────────
 function renderGenerate(prefillProgramId) {
   updateRiskBadge();
-  const programs = getPrograms();
+  const programs = getSimulatedPrograms(getPrograms());
   const prefill = prefillProgramId ? getProgramById(prefillProgramId) : null;
   const sg = state.generate;
 
@@ -1096,7 +1115,7 @@ window.removeGenFile = (idx) => {
 // ── PROGRAMS ──────────────────────────────────────────────────────
 function renderPrograms() {
   updateRiskBadge();
-  const programs = getPrograms();
+  const programs = getSimulatedPrograms(getPrograms());
   const el = document.getElementById('apppage-programs');
   el.innerHTML = `
     <div class="page-header">
@@ -1132,7 +1151,13 @@ function renderPrograms() {
               <div class="program-right" style="gap:8px;">
                 ${isWatermelon(p, getActiveRisks()) ? `<div class="badge badge-error pulse-slow" title="Metadata inconsistency detected">🍉 Artificial Green</div>` : ''}
                 ${ragBadge(p.rag)}
-                <button class="btn btn-secondary btn-sm" onclick="goToGenerate('${p.id}')">Update</button>
+                ${isSandboxActive() ? `
+                  <button class="btn btn-secondary btn-sm" style="border-color:var(--warn); color:var(--warn);" onclick="window.doSimulateSlip('${p.id}')">
+                    💥 Simulate Slip
+                  </button>
+                ` : `
+                  <button class="btn btn-secondary btn-sm" onclick="goToGenerate('${p.id}')">Update</button>
+                `}
                 <button class="btn btn-ghost btn-sm" onclick="showEditProgramModal('${p.id}')">${ICONS.edit}</button>
                 <button class="btn btn-ghost btn-sm text-danger" onclick="confirmDeleteProgram('${p.id}')">${ICONS.trash}</button>
               </div>
@@ -1330,6 +1355,11 @@ function renderVisuals() {
         <div class="page-subtitle">A high-level view of dependencies, timelines, and reporting across your portfolio.</div>
       </div>
       <div class="flex gap-8">
+        ${!isSandboxActive() ? `
+          <button class="btn btn-secondary" onclick="window.enterSandbox()">
+            🧪 Enter Simulation Sandbox
+          </button>
+        ` : ''}
         <button class="btn btn-secondary" onclick="window.print()">
           ${ICONS.copy} PDF Export
         </button>
@@ -1418,7 +1448,7 @@ function renderPortfolioTimeline(container) {
 }
 
 function renderDependencyMapper(container) {
-  const programs = getPrograms();
+  const programs = getSimulatedPrograms(getPrograms());
   const links = [];
   
   // Custom Mermaid Initialization for World Class Visuals
@@ -2429,24 +2459,32 @@ function getDisplayName() {
   return full.split(' ')[0];
 }
 
-// Make key functions globally accessible
-window.showPage     = showPage;
-window.showAppPage  = showAppPage;
-window.toast        = toast;
-window.openLoginModal = showLoginModal;
-window.openApiKeyModal = showApiKeyModal;
-window.openSupabaseConfig = showSupabaseConfigModal;
+// ── SANDBOX HANDLERS ──────────────────────────────────────────────
+window.enterSandbox = function() {
+  initSandbox(getPrograms());
+  toast('Entered Sandbox Mode. Modeling current portfolio.', 'info');
+  renderApp(); // Redraw whole layout with banner
+  showAppPage('visuals');
+};
 
-window.currentUser = null;
+window.exitSandbox = function() {
+  resetSandbox();
+  toast('Exited Sandbox. Returned to Live Data.', 'success');
+  renderApp();
+};
 
-// Track auth state
-onAuthStateChange((event, user) => {
-  window.currentUser = user;
-  updateAuthUI();
-  if (event === 'SIGNED_IN') {
-    toast(`Welcome back, ${user.user_metadata?.full_name || user.email}!`, 'success');
-  }
-});
+window.doResetSandbox = function() {
+  initSandbox(getPrograms());
+  toast('Simulation reset to live baseline.', 'info');
+  renderApp();
+};
+
+window.doSimulateSlip = function(id) {
+  const days = 14; // Default to 2 weeks for quick modeling
+  simulateSlip(id, days);
+  toast(`Simulated ${days}-day slip. Calculated blast radius.`, 'warn');
+  renderVisuals(); // Update visuals specifically
+};
 
 function updateAuthUI() {
   const sidebarFooter = document.querySelector('.sidebar-footer');
