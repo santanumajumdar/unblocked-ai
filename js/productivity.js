@@ -45,7 +45,8 @@ export function isWatermelon(program, activeRisks = []) {
 export function generateCoachAdvice() {
   const programs = getPrograms();
   const contention = getContentionReport();
-  const criticalRisks = getActiveRisks().filter(r => r.severity === 'high');
+  const activeRisks = getActiveRisks();
+  const criticalRisks = activeRisks.filter(r => r.severity === 'high');
 
   const advice = [];
   
