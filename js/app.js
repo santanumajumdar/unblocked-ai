@@ -100,6 +100,7 @@ function renderPage(name) {
     integrations: renderIntegrationsPage,
     monitoring: renderMonitoring,
     coaching:   () => renderCoaching(document.getElementById('apppage-coaching'), showAppPage),
+    decisions:  renderDecisions,
     settings:  renderSettings
   };
   if (renders[name]) renders[name]();
