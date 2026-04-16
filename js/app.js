@@ -362,60 +362,57 @@ function renderDecisions() {
   const programs = getPrograms();
 
   el.innerHTML = `
-    <div class="page-header">
-      <div>
-        <div class="page-title">Decision <em>Registry</em> 📜</div>
-        <div class="page-subtitle">A centralized audit trail of formal agreements, architectural pivots, and steering approvals.</div>
+    <div class="page-header" style="justify-content: center; text-align: center; border-bottom: none; padding-bottom: 40px;">
+      <div style="max-width: 700px;">
+        <div class="page-title" style="font-size: 32px; margin-bottom: 8px;">Institutional <em>Memory</em> 📜</div>
+        <div class="page-subtitle" style="font-size: 15px;">A pristine audit trail of critical steering alignments, pivots, and executive approvals.</div>
       </div>
-      <button class="btn btn-primary" onclick="window.showAddDecisionModal()">
-        ${ICONS.plus} Log New Decision
-      </button>
+      <div style="position: absolute; right: 30px; bottom: 40px;">
+        <button class="btn btn-primary" onclick="window.showAddDecisionModal()">
+          ${ICONS.plus} Log New Decision
+        </button>
+      </div>
     </div>
-    <div class="page-body">
-      <div class="card p-0 overflow-hidden">
-        <div class="flex items-center gap-12 p-16 border-b" style="background:rgba(255,255,255,0.02);">
-          <div class="flex-1">
-            <input type="text" class="input" placeholder="Search decisions by title or keywords..." id="decision-search">
+    <div class="page-body" style="padding-top: 0;">
+      <div class="flex items-center gap-12 mb-32 p-8" style="background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:32px; max-width: 600px; margin: 0 auto 40px;">
+        <div class="flex-1" style="padding-left: 12px;">
+          <input type="text" class="input" style="background:transparent; border:none; box-shadow:none;" placeholder="Search audits..." id="decision-search">
+        </div>
+        <select class="input" style="width:160px; background:rgba(0,0,0,0.2); border:none; border-radius:24px;" id="decision-filter-prog">
+          <option value="">All Programs</option>
+          ${programs.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+        </select>
+      </div>
+      
+      <div class="decision-timeline" id="decision-timeline-body">
+        ${decisions.length === 0 ? `<div class="p-40 text-center color-secondary card">No decisions logged in this registry yet.</div>` : ''}
+        ${decisions.sort((a,b) => new Date(b.date) - new Date(a.date)).map((d, i) => `
+          <div class="decision-card animate-fade-in-up animate-stagger-${(i % 4) + 1}">
+            <div class="decision-card-header">
+              <div>
+                <div class="decision-program">
+                  <span class="rag-dot" style="background:var(--accent)"></span>
+                  ${d.programName}
+                </div>
+                <div class="decision-title">${d.title}</div>
+              </div>
+              <div class="flex gap-8">
+                 ${personaBadge('steering')}
+                 <button class="btn btn-ghost btn-icon text-danger" style="border:none; background:transparent;" onclick="window.confirmDeleteDecision('${d.id}')">${ICONS.trash}</button>
+              </div>
+            </div>
+            <div class="decision-rationale">
+              ${d.rationale}
+            </div>
+            <div class="decision-footer">
+              <div class="decision-dri">
+                <div class="dri-avatar">${(d.dri || 'SM').split(' ').map(n => n[0]).join('').toUpperCase()}</div>
+                <div>Confirmed by <strong>${d.dri}</strong></div>
+              </div>
+              <div class="decision-date">${new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+            </div>
           </div>
-          <select class="input" style="width:200px;" id="decision-filter-prog">
-            <option value="">All Programs</option>
-            ${programs.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-          </select>
-        </div>
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th style="width:250px;">Program</th>
-                <th>Decision</th>
-                <th>Rationale / Drift</th>
-                <th style="width:140px;">DRI</th>
-                <th style="width:120px;">Date</th>
-                <th style="width:80px;"></th>
-              </tr>
-            </thead>
-            <tbody id="decision-list-body">
-              ${decisions.length === 0 ? `<tr><td colspan="6" class="p-40 text-center color-secondary">No decisions logged yet.</td></tr>` : ''}
-              ${decisions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(d => `
-                <tr>
-                  <td>
-                    <div class="flex items-center gap-8">
-                      <span class="rag-dot" style="background:var(--blue-light)"></span>
-                      ${truncate(d.programName, 40)}
-                    </div>
-                  </td>
-                  <td><div style="font-weight:500;">${d.title}</div></td>
-                  <td><div class="text-sm color-secondary">${truncate(d.rationale, 100)}</div></td>
-                  <td>${personaBadge('steering')} ${d.dri}</td>
-                  <td>${d.date}</td>
-                  <td class="text-right">
-                    <button class="btn btn-ghost btn-xs text-danger" onclick="window.confirmDeleteDecision('${d.id}')">${ICONS.trash}</button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
+        `).join('')}
       </div>
     </div>
   `;
@@ -426,22 +423,29 @@ function renderDecisions() {
   const filter = () => {
     const q = searchInput.value.toLowerCase();
     const p = progFilter.value;
-    const body = el.querySelector('#decision-list-body');
+    const body = el.querySelector('#decision-timeline-body');
     const filtered = getDecisions().filter(d => 
       (!p || d.programId === p) && 
       (!q || d.title.toLowerCase().includes(q) || d.rationale.toLowerCase().includes(q))
     );
-    body.innerHTML = filtered.map(d => `
-      <tr>
-        <td>${truncate(d.programName, 40)}</td>
-        <td><div style="font-weight:500;">${d.title}</div></td>
-        <td><div class="text-sm color-secondary">${truncate(d.rationale, 100)}</div></td>
-        <td>${d.dri}</td>
-        <td>${d.date}</td>
-        <td class="text-right">
-          <button class="btn btn-ghost btn-xs text-danger" onclick="window.confirmDeleteDecision('${d.id}')">${ICONS.trash}</button>
-        </td>
-      </tr>
+    body.innerHTML = filtered.map((d, i) => `
+      <div class="decision-card animate-fade-in-up" style="animation-delay:${(i%4)*0.1}s">
+        <div class="decision-card-header">
+           <div>
+            <div class="decision-program">${d.programName}</div>
+            <div class="decision-title">${d.title}</div>
+          </div>
+          <button class="btn btn-ghost btn-icon text-danger" style="border:none; background:transparent;" onclick="window.confirmDeleteDecision('${d.id}')">${ICONS.trash}</button>
+        </div>
+        <div class="decision-rationale">${d.rationale}</div>
+        <div class="decision-footer">
+          <div class="decision-dri">
+            <div class="dri-avatar">${(d.dri || 'SM').split(' ').map(n => n[0]).join('').toUpperCase()}</div>
+            <span>${d.dri}</span>
+          </div>
+          <div class="decision-date">${d.date}</div>
+        </div>
+      </div>
     `).join('');
   };
   searchInput.oninput = filter;

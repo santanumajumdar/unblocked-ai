@@ -51,6 +51,11 @@
   
   --transition:       all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --shadow-premium:   0 10px 30px -10px rgba(0, 0, 0, 0.7);
+  
+  /* Glassmorphism */
+  --glass-bg:         rgba(20, 20, 23, 0.72);
+  --glass-blur:       blur(24px);
+  --glass-border:     rgba(255, 255, 255, 0.08);
 }
 
 /* ── RESET ──────────────────────────────────────────────── */
@@ -763,6 +768,129 @@ select {
   .card, .mbr-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
   #apppage-visuals, #visuals-content { display: block !important; }
   @page { margin: 2cm; }
+}
+
+/* ── PREMIUM DECISION REGISTRY ──────────────────────────── */
+.decision-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.decision-card {
+  position: relative;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  transition: var(--transition);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.decision-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+.decision-card:hover {
+  transform: translateY(-4px) scale(1.005);
+  border-color: rgba(212, 175, 55, 0.4);
+  box-shadow: 0 20px 40px -20px rgba(0,0,0,0.8);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.decision-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.decision-title {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.decision-program {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.decision-rationale {
+  font-size: 14.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+.decision-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.decision-dri {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dri-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-light);
+  border: 1px solid var(--accent-glow);
+}
+
+.decision-date {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* Animations */
+.animate-stagger-1 { animation-delay: 0.1s; }
+.animate-stagger-2 { animation-delay: 0.2s; }
+.animate-stagger-3 { animation-delay: 0.3s; }
+.animate-stagger-4 { animation-delay: 0.4s; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ── RESPONSIVE ─────────────────────────────────────────── */
