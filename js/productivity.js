@@ -5,6 +5,7 @@
 
 import { getPrograms, getActiveRisks, getContentionReport, getRisks } from './programs.js';
 import { ICONS, toast } from './ui.js';
+import { getStrategicPillars, calculateAlignmentScore } from './strategy.js';
 
 /**
  * isWatermelon — Heuristic to detect "Artificial Green" programs
@@ -47,6 +48,7 @@ export function generateCoachAdvice() {
   const contention = getContentionReport();
   const activeRisks = getActiveRisks();
   const criticalRisks = activeRisks.filter(r => r.severity === 'high');
+  const pillars = getStrategicPillars();
 
   const advice = [];
   
@@ -109,6 +111,24 @@ export function generateCoachAdvice() {
       title: 'Artificial Green Detected',
       desc: `${watermelons.length} program${watermelons.length > 1 ? 's are' : ' is'} reporting Green despite conflicting metadata (deadlines, blockers, or risks).`,
       actionLabel: 'Verify reporting integrity',
+      targetPage: 'programs'
+    });
+  }
+
+  // Heuristic: Sub-Optimal Alignment (High Resource Usage, Low Strategic Value)
+  const lowAlignment = programs.filter(p => {
+    const score = calculateAlignmentScore(p, pillars);
+    const isHighResource = p.rag === 'red' || p.rag === 'amber'; // High friction programs
+    return score < 50 && isHighResource;
+  });
+
+  if (lowAlignment.length > 0) {
+    advice.push({
+      id: 'alignment',
+      icon: '🎯',
+      title: 'Strategic Divergence',
+      desc: `${lowAlignment.length} program${lowAlignment.length > 1 ? 's have' : ' has'} low strategic alignment but are consuming significant management overhead.`,
+      actionLabel: 'Review prioritization',
       targetPage: 'programs'
     });
   }

@@ -26,8 +26,7 @@ import {
 } from './integrations.js';
 
 import { renderCoaching, isWatermelon } from './productivity.js';
-
-
+import { getStrategicPillars, saveStrategicPillars, calculateAlignmentScore } from './strategy.js';
 import {
   toast, openModal, confirm as uiConfirm, copyText,
   formatDate, daysAgo, ragBadge, ragEmoji, ragLabel,
@@ -470,6 +469,52 @@ function renderDashboard() {
       </div>
 
       <div class="divider"></div>
+      
+      <div class="mb-24">
+        <div class="font-500 mb-12" style="font-size:14px;">Strategic Alignment Distribution</div>
+        <div class="card" style="padding:20px;">
+          <div class="flex items-center gap-24">
+            ${(() => {
+              const pillars = getStrategicPillars();
+              const scores = programs.map(p => calculateAlignmentScore(p, pillars));
+              const high = scores.filter(s => s >= 80).length;
+              const med = scores.filter(s => s >= 50 && s < 80).length;
+              const low = scores.filter(s => s < 50).length;
+              const total = scores.length || 1;
+              
+              return `
+                <div style="flex:1;">
+                   <div class="flex items-center justify-between text-xs mb-6">
+                     <span class="color-muted">High Alignment (80%+)</span>
+                     <span class="font-600" style="color:var(--success)">${high} programs</span>
+                   </div>
+                   <div style="height:6px; background:var(--border); border-radius:10px; overflow:hidden;">
+                     <div style="width:${(high/total)*100}%; height:100%; background:var(--success);"></div>
+                   </div>
+                </div>
+                <div style="flex:1;">
+                   <div class="flex items-center justify-between text-xs mb-6">
+                     <span class="color-muted">Moderate (50-79%)</span>
+                     <span class="font-600" style="color:var(--blue-light)">${med} programs</span>
+                   </div>
+                   <div style="height:6px; background:var(--border); border-radius:10px; overflow:hidden;">
+                     <div style="width:${(med/total)*100}%; height:100%; background:var(--blue-light);"></div>
+                   </div>
+                </div>
+                <div style="flex:1;">
+                   <div class="flex items-center justify-between text-xs mb-6">
+                     <span class="color-muted">Low / Unknown (<50%)</span>
+                     <span class="font-600" style="color:var(--warn)">${low} programs</span>
+                   </div>
+                   <div style="height:6px; background:var(--border); border-radius:10px; overflow:hidden;">
+                     <div style="width:${(low/total)*100}%; height:100%; background:var(--warn);"></div>
+                   </div>
+                </div>
+              `;
+            })()}
+          </div>
+        </div>
+      </div>
       <div class="flex items-center justify-between mb-12">
         <div class="font-500" style="font-size:14px;">Recent updates</div>
         <button class="btn btn-ghost btn-sm" onclick="showAppPage('history')">Full history</button>
@@ -1077,7 +1122,12 @@ function renderPrograms() {
               <div class="program-icon" style="background:var(--${p.rag==='red'?'danger':p.rag==='amber'?'warn':'success'}-bg)">${ragEmoji(p.rag)}</div>
               <div class="program-info">
                 <div class="program-name">${p.name}</div>
-                <div class="program-meta">${p.team} &middot; ${p.quarter} &middot; Next: ${p.milestone || '—'}</div>
+                <div class="program-meta">
+                  ${p.team} &middot; ${p.quarter} &middot; Next: ${p.milestone || '—'}
+                  <span style="margin-left:8px; padding:2px 6px; background:var(--card-bg); border-radius:4px; font-size:10px; font-weight:600; color:var(--text-secondary); border:1px solid var(--border);">
+                    🎯 Alignment: ${calculateAlignmentScore(p, getStrategicPillars())}%
+                  </span>
+                </div>
               </div>
               <div class="program-right" style="gap:8px;">
                 ${isWatermelon(p, getActiveRisks()) ? `<div class="badge badge-error pulse-slow" title="Metadata inconsistency detected">🍉 Artificial Green</div>` : ''}
@@ -2252,6 +2302,28 @@ function renderSettings() {
       </div>
 
       <div class="settings-section">
+        <div class="settings-title">Strategic Pillars (North Star)</div>
+        <div class="settings-desc mb-16">Define your organization's quarterly goals. Our AI uses these to calculate program alignment scores.</div>
+        <div id="settings-pillars-list">
+          ${getStrategicPillars().map(p => `
+            <div class="setting-row" style="padding: 10px; background: var(--card-bg); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-color);">
+              <div class="setting-info">
+                <div class="setting-name" style="font-size: 13.5px;">${p.title}</div>
+                <div class="setting-desc" style="font-size: 11px;">Keywords: ${p.keywords.join(', ')}</div>
+              </div>
+              <button class="btn btn-ghost btn-sm text-danger" onclick="removePillar('${p.id}')">${ICONS.trash}</button>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="flex gap-8 mt-12">
+          <input type="text" id="new-pillar-title" placeholder="e.g. Reduce Infra Costs" style="flex:1;">
+          <input type="text" id="new-pillar-keywords" placeholder="Keywords (comma separated)" style="flex:1;">
+          <button class="btn btn-secondary btn-sm" onclick="handleAddPillar()">Add Pillar</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <div class="settings-title">Account Actions</div>
         <div class="setting-row" style="border:none;padding-top:0;">
           <div class="setting-info">
@@ -2283,6 +2355,31 @@ window.saveProfile = function() {
   if (nameEl && name) nameEl.textContent = name;
   if (roleEl && role) roleEl.textContent = role;
   toast('Profile saved!', 'success');
+};
+
+window.handleAddPillar = function() {
+  const title = document.getElementById('new-pillar-title').value.trim();
+  const kwStr = document.getElementById('new-pillar-keywords').value.trim();
+  if (!title) return toast('Please enter a pillar title', 'error');
+  
+  const pillars = getStrategicPillars();
+  const newP = {
+    id: 'pill_' + Date.now(),
+    title,
+    keywords: kwStr.split(',').map(k => k.trim()).filter(k => k)
+  };
+  
+  pillars.push(newP);
+  saveStrategicPillars(pillars);
+  renderSettings();
+  toast('Strategic pillar added', 'success');
+};
+
+window.removePillar = function(id) {
+  const pillars = getStrategicPillars().filter(p => p.id !== id);
+  saveStrategicPillars(pillars);
+  renderSettings();
+  toast('Pillar removed', 'info');
 };
 
 window.savePref = function(key, value) {
