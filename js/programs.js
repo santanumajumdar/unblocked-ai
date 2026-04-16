@@ -98,41 +98,74 @@ const DEFAULT_PROGRAMS = [
 ];
 
 const DEFAULT_HISTORY = [
+  // Platform Team - Scenario: Fatigue (High Pressure + Dropping Velocity)
   {
-    id: 'hist_1',
-    programId: 'prog_4',
-    programName: 'Atlas — Global Localization System',
-    personas: ['exec', 'pm'],
-    rag: 'green',
-    sentimentScore: 8,
-    sentimentLabel: 'Confident',
-    preview: 'Phase 1 language model evaluation on track. 3 target markets confirmed. No blockers.',
-    content: { exec: 'Status: On Track — Atlas Global Localization\n\nPhase 1 evaluation complete. 3 target markets (DE, JP, BR) confirmed. Engineering at 72% against plan. No blockers. On track for Jun 30 delivery.' },
-    createdAt: Date.now() - 1 * 86400000
-  },
-  {
-    id: 'hist_2',
+    id: 'hist_p1',
     programId: 'prog_3',
     programName: 'Nexus — Developer Platform Reboot',
-    personas: ['exec', 'steering'],
     rag: 'red',
     sentimentScore: 3,
     sentimentLabel: 'Urgent',
-    preview: 'At risk. DevOps CI/CD dependency blocked 9 days. VP escalation requested.',
-    content: { exec: 'Status: At Risk — Nexus Developer Platform\n\nCritical blocker: DevOps CI/CD pipeline dependency open 9 days, no ETA. Mobile SDK descoped to Q3. Requesting VP-level escalation by Apr 18.' },
+    velocity: 28, // Dropping from 40
+    preview: 'Critical blocker on CI/CD. Team working overtime.',
+    createdAt: Date.now() - 1 * 86400000
+  },
+  {
+    id: 'hist_p2',
+    programId: 'prog_3',
+    programName: 'Nexus — Developer Platform Reboot',
+    rag: 'amber',
+    sentimentScore: 5,
+    sentimentLabel: 'Concerned',
+    velocity: 34,
+    preview: 'Observing delays in infra-as-code migration.',
+    createdAt: Date.now() - 8 * 86400000
+  },
+  {
+    id: 'hist_p3',
+    programId: 'prog_3',
+    programName: 'Nexus — Developer Platform Reboot',
+    rag: 'green',
+    sentimentScore: 8,
+    sentimentLabel: 'Stable',
+    velocity: 40,
+    preview: 'Phase 1 complete. Steady progress.',
+    createdAt: Date.now() - 15 * 86400000
+  },
+  // Data Team - Scenario: Over-indexed (High Input + Flat Velocity)
+  {
+    id: 'hist_d1',
+    programId: 'prog_2',
+    programName: 'Meridian — Data Governance Framework',
+    rag: 'amber',
+    sentimentScore: 4,
+    sentimentLabel: 'Strained',
+    velocity: 22,
+    preview: 'Legal review delay. Backlog growing.',
     createdAt: Date.now() - 2 * 86400000
   },
   {
-    id: 'hist_3',
-    programId: 'prog_1',
-    programName: 'Orion — Cloud Cost Optimization',
-    personas: ['pm'],
+    id: 'hist_d2',
+    programId: 'prog_2',
+    programName: 'Meridian — Data Governance Framework',
+    rag: 'green',
+    sentimentScore: 7,
+    sentimentLabel: 'Active',
+    velocity: 23,
+    preview: 'Initial schemas approved.',
+    createdAt: Date.now() - 9 * 86400000
+  },
+  // Infrastructure - Scenario: Healthy
+  {
+    id: 'hist_i1',
+    programId: 'prog_5',
+    programName: 'Pulse — Real-Time Observability',
     rag: 'green',
     sentimentScore: 9,
-    sentimentLabel: 'Optimistic',
-    preview: 'Cost model finalized. Projected 31% infrastructure savings in pilot phase.',
-    content: { pm: 'Orion update: Cost model finalized and approved. Pilot with Platform, SRE, and Data Eng teams starting May 1. Projected savings: 31% infra cost reduction. No blockers.' },
-    createdAt: Date.now() - 4 * 86400000
+    sentimentLabel: 'Confident',
+    velocity: 45,
+    preview: 'Rollout trending ahead of schedule.',
+    createdAt: Date.now() - 3 * 86400000
   }
 ];
 
@@ -338,6 +371,58 @@ export function deleteDecision(id) {
 
 export function getDecisionsByProgram(programId) {
   return getDecisions().filter(d => d.programId === programId);
+}
+
+// ── CAPACITY ANALYSIS ───────────────────────────────────────────────
+export function getTeamFatigueAnalysis() {
+  const history = getHistory();
+  const programs = getPrograms();
+  const teams = [...new Set(programs.map(p => p.team).filter(Boolean))];
+  
+  const analysis = teams.map(teamName => {
+    const teamHistory = history
+      .filter(h => {
+        const p = programs.find(pg => pg.id === h.programId);
+        return p && p.team === teamName;
+      })
+      .sort((a,b) => b.createdAt - a.createdAt);
+
+    if (teamHistory.length < 2) return null;
+
+    const current = teamHistory[0];
+    const previous = teamHistory[1];
+    
+    const sentimentDelta = (current.sentimentScore || 0) - (previous.sentimentScore || 0);
+    const velocityDelta = (current.velocity || 0) - (previous.velocity || 0);
+    
+    // Fatigue Logic: Sentiment ↘️ AND Velocity ↘️
+    let fatigueLevel = 'low';
+    let prediction = 'Stable execution';
+    let suggestion = '';
+
+    if (sentimentDelta <= -2 && velocityDelta <= -5) {
+      fatigueLevel = 'critical';
+      prediction = 'Burnout likely in 2-3 weeks';
+      suggestion = 'Reduce sprint scope by 20% immediately to stabilize.';
+    } else if (sentimentDelta < 0 || velocityDelta < 0) {
+      fatigueLevel = 'medium';
+      prediction = 'Potential delivery slip in Q3';
+      suggestion = 'Monitor 1:1s and re-prioritize technical debt.';
+    }
+
+    return {
+      team: teamName,
+      fatigueLevel,
+      sentimentTrend: sentimentDelta,
+      velocityTrend: velocityDelta,
+      currentVelocity: current.velocity || 0,
+      prediction,
+      suggestion,
+      updatedAt: current.createdAt
+    };
+  }).filter(Boolean);
+
+  return analysis;
 }
 
 // ── MONITORING & CROSS-PROGRAM INSIGHTS ────────────────────────────

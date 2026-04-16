@@ -7,7 +7,8 @@ import {
   getHistory, addHistoryEntry,
   getRisks, getActiveRisks, acknowledgeRisk, dismissRisk,
   getStats, getContentionReport,
-  getDecisions, saveDecision, deleteDecision, getDecisionsByProgram
+  getDecisions, saveDecision, deleteDecision, getDecisionsByProgram,
+  getTeamFatigueAnalysis
 } from './programs.js';
 
 import {
@@ -1972,6 +1973,7 @@ function renderMonitoring() {
       <div class="flex justify-start mb-24">
         <div class="v-tabs">
           <div class="v-tab ${activeMonitorTab === 'trends' ? 'active' : ''}" onclick="switchMonitorTab('trends')">Sentiment Trends</div>
+          <div class="v-tab ${activeMonitorTab === 'fatigue' ? 'active' : ''}" onclick="switchMonitorTab('fatigue')">Capacity & Fatigue ⚖️</div>
           <div class="v-tab ${activeMonitorTab === 'radar' ? 'active' : ''}" onclick="switchMonitorTab('radar')">Contention Radar</div>
           <div class="v-tab ${activeMonitorTab === 'meeting' ? 'active' : ''}" onclick="switchMonitorTab('meeting')">Meeting-to-Status</div>
         </div>
@@ -1991,8 +1993,88 @@ window.switchMonitorTab = function(tab) {
 function renderMonitoringContent() {
   const container = document.getElementById('monitoring-content');
   if (activeMonitorTab === 'trends') renderSentimentTrends(container);
+  else if (activeMonitorTab === 'fatigue') renderCapacityFatigue(container);
   else if (activeMonitorTab === 'radar') renderContentionRadar(container);
   else if (activeMonitorTab === 'meeting') renderMeetingProcessor(container);
+}
+
+function renderCapacityFatigue(container) {
+  const fatigue = getTeamFatigueAnalysis();
+  
+  container.innerHTML = `
+    <div class="mb-32">
+      <div class="flex items-center gap-12 mb-24">
+        <div style="font-size:24px;">⚖️</div>
+        <div>
+          <div style="font-size:18px; font-weight:600; font-family:var(--font-heading);">Capacity Early Warning</div>
+          <div class="text-xs color-secondary">Predicting delivery blocks by analyzing Sentiment Trajectory vs. Throughput Velocity.</div>
+        </div>
+      </div>
+      
+      <div class="grid-2">
+        ${fatigue.map(f => `
+          <div class="card p-24 animate-fade-in-up">
+            <div class="flex items-center justify-between mb-20">
+              <div>
+                <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:4px;">${f.team}</div>
+                <div style="font-size:20px; font-weight:500;">Fatigue Index</div>
+              </div>
+              <div class="badge ${f.fatigueLevel === 'critical' ? 'badge-error' : f.fatigueLevel === 'medium' ? 'badge-warn' : 'badge-success'}" style="padding:4px 12px; border-radius:30px;">
+                ${f.fatigueLevel.toUpperCase()}
+              </div>
+            </div>
+            
+            <div class="mb-24">
+              <div class="flex items-center justify-between mb-8">
+                <span class="text-xs color-secondary font-500">Throughput Stability</span>
+                <span class="text-xs font-600 ${f.velocityTrend < 0 ? 'text-danger' : 'text-success'}">
+                  ${f.velocityTrend < 0 ? '↘' : '↗'} ${Math.abs(f.velocityTrend)} story points
+                </span>
+              </div>
+              <div style="height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden; position:relative;">
+                <div style="width:${Math.min(100, (f.currentVelocity / 50) * 100)}%; height:100%; background:${f.fatigueLevel === 'critical' ? 'var(--danger)' : f.fatigueLevel === 'medium' ? 'var(--warn)' : 'var(--success)'}; transition: width 1s ease-out; box-shadow:0 0 10px ${f.fatigueLevel === 'critical' ? 'rgba(239,68,68,0.4)' : 'transparent'};"></div>
+              </div>
+            </div>
+
+            <div class="p-16 mb-20" style="background:rgba(255,255,255,0.02); border-radius:12px; border:1px solid var(--border); border-left:4px solid ${f.fatigueLevel === 'critical' ? 'var(--danger)' : 'var(--accent)'}">
+              <div class="flex items-center gap-8 mb-8">
+                <div class="text-xs font-700 color-secondary" style="letter-spacing:0.05em;">AI PREDICTION</div>
+                ${f.fatigueLevel === 'critical' ? '<span class="pulse-marker" style="--pulse-color:var(--danger)"></span>' : ''}
+              </div>
+              <div class="text-sm font-600 mb-6" style="color:var(--text-primary); line-height:1.4;">${f.prediction}</div>
+              <div class="text-xs color-secondary" style="line-height:1.5;">${f.suggestion}</div>
+            </div>
+            
+            <div class="flex items-center justify-between text-xs color-muted border-top pt-16 mt-4">
+              <div class="flex items-center gap-6">
+                ${ICONS.history} Trends: ${daysAgo(f.updatedAt)}
+              </div>
+              <div class="flex items-center gap-10">
+                <span class="flex items-center gap-4">
+                  Sentiment: <span class="${f.sentimentTrend < 0 ? 'text-danger' : 'text-success'} font-600">${f.sentimentTrend > 0 ? '+' : ''}${f.sentimentTrend}</span>
+                </span>
+                <span class="flex items-center gap-4">
+                  Velocity: <span class="${f.velocityTrend < 0 ? 'text-danger' : 'text-success'} font-600">${f.velocityTrend > 0 ? '+' : ''}${f.velocityTrend}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="card bg-surface-dim mt-24">
+        <div class="card-body flex items-start gap-16">
+          <div style="font-size:24px;">💡</div>
+          <div>
+            <div class="font-600 mb-4" style="color:var(--accent-light);">Understanding Fatigue Metrics</div>
+            <div class="text-sm color-secondary leading-relaxed">
+              Early Warning identifies <strong>Structural Divergence</strong>. When sentiment trends down but velocity remains high, team fatigue usually stays hidden until a sudden delivery failure occurs. We analyze tone across Slack transcripts and meeting status updates to predict these peaks.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderSentimentTrends(container) {

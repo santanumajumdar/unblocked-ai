@@ -3,7 +3,10 @@
  * Focuses on proactive coaching and interactive agent-assisted drafting.
  */
 
-import { getPrograms, getActiveRisks, getContentionReport, getRisks } from './programs.js';
+import { 
+  getPrograms, getActiveRisks, getContentionReport, getRisks,
+  getTeamFatigueAnalysis 
+} from './programs.js';
 import { ICONS, toast } from './ui.js';
 import { getStrategicPillars, calculateAlignmentScore } from './strategy.js';
 
@@ -99,6 +102,19 @@ export function generateCoachAdvice() {
       desc: `There are ${criticalRisks.length} high-severity risks that haven't been acknowledged or escalated to senior leadership yet.`,
       actionLabel: 'Review risks',
       targetPage: 'risks'
+    });
+  }
+
+  // Heuristic: Team Fatigue / Capacity Warnings ⚖️
+  const fatigue = getTeamFatigueAnalysis().filter(f => f.fatigueLevel === 'critical');
+  if (fatigue.length > 0) {
+    advice.push({
+      id: 'fatigue',
+      icon: '⚖️',
+      title: 'Predictive Fatigue Warning',
+      desc: `System predicts burnout for '${fatigue[0].team}' in ~2 weeks. Both sentiment and velocity trajectories are trending negative.`,
+      actionLabel: 'Adjust Capacity',
+      targetPage: 'monitoring'
     });
   }
 
