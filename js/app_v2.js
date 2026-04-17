@@ -3249,33 +3249,33 @@ function renderBlastRadius() {
       </div>
 
       <div id="blast-results-area" style="display:none;" class="animate-fade-in">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-24 mb-40">
-          <div class="intel-stat-card">
+        <div class="grid md:grid-cols-4 gap-24 mb-40">
+          <div class="intel-stat-card" onclick="document.getElementById('blast-impact-list').scrollIntoView({behavior:'smooth'})">
             <div class="intel-stat-val text-danger" id="stat-red-delta">0</div>
             <div class="intel-stat-lab">New Critical Path (REDS)</div>
           </div>
-          <div class="intel-stat-card">
+          <div class="intel-stat-card" onclick="document.getElementById('blast-impact-list').scrollIntoView({behavior:'smooth'})">
             <div class="intel-stat-val text-amber" id="stat-amber-delta">0</div>
             <div class="intel-stat-lab">New Risks (AMBER)</div>
           </div>
-          <div class="intel-stat-card">
+          <div class="intel-stat-card" onclick="document.getElementById('blast-impact-list').scrollIntoView({behavior:'smooth'})">
             <div class="intel-stat-val text-primary" id="stat-total-shifted">0</div>
             <div class="intel-stat-lab">Affected Initiatives</div>
           </div>
-          <div class="intel-stat-card">
+          <div class="intel-stat-card" onclick="document.getElementById('blast-report-text').scrollIntoView({behavior:'smooth'})">
             <div class="intel-stat-val" style="color:#10b981;">98%</div>
             <div class="intel-stat-lab">Model Integrity</div>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-32">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-32" style="align-items: start;">
           <div class="intel-card" style="padding:32px;">
-            <h3 class="text-xs font-800 opacity-60 mb-24 uppercase letter-spacing-2" style="color:var(--text-primary);">Cascade Visualization</h3>
+            <h3 class="text-xs font-800 opacity-60 mb-16 uppercase letter-spacing-2" style="color:var(--text-primary);">Cascade Visualization</h3>
             <div id="blast-impact-list" class="flex flex-col gap-16"></div>
           </div>
-          <div class="intel-card" style="padding:32px; background:rgba(10, 15, 25, 0.95);">
-             <h3 class="text-xs font-800 opacity-60 mb-24 uppercase letter-spacing-2" style="color:var(--text-primary);">Risk Synthesis Report</h3>
-             <div id="blast-report-text" class="color-secondary" style="font-size:14px; line-height:1.8; opacity:0.85;"></div>
+          <div class="intel-card" style="padding:32px; background:rgba(10, 15, 25, 0.98);">
+             <h3 class="text-xs font-800 opacity-60 mb-16 uppercase letter-spacing-2" style="color:var(--text-primary);">Risk Synthesis Report</h3>
+             <div id="blast-report-text" class="color-secondary" style="font-size:14px; line-height:1.7; opacity:0.9;"></div>
           </div>
         </div>
       </div>
