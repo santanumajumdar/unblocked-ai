@@ -2383,15 +2383,89 @@ select {
   100% { top: 100%; opacity: 0; }
 }
 
-.intel-stat-val { 
-  font-size: 42px; 
-  font-weight: 800; 
-  font-family: 'Outfit', sans-serif; 
-  letter-spacing: -2px; 
-  line-height: 1; /* FIX: Prevents overlap of labels */
-  margin-bottom: 2px;
-  cursor: pointer;
-  transition: all 0.3s ease;
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes signal-trace {
+  0% { transform: translateY(0); opacity: 0.1; }
+  50% { opacity: 0.4; }
+  100% { transform: translateY(-100%); opacity: 0.1; }
+}
+
+@keyframes diagnostic-flicker {
+  0%, 100% { opacity: 1; }
+  33% { opacity: 0.8; }
+  35% { opacity: 1; filter: brightness(1.2); }
+  66% { opacity: 0.9; }
+}
+
+.tactical-mono {
+  font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+  letter-spacing: 1px;
+}
+
+.pixel-grain {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+.synaptic-radar {
+  width: 200px; height: 200px;
+  position: relative;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.05), transparent);
+  overflow: hidden;
+}
+
+.radar-sweep-hand {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 50%; height: 50%;
+  background: conic-gradient(from 180deg at 0% 0%, rgba(59, 130, 246, 0.4), transparent);
+  transform-origin: 0% 0%;
+  animation: radar-sweep 4s linear infinite;
+  pointer-events: none;
+}
+
+.hud-signal-trace {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 200px;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, transparent, #000, transparent);
+}
+
+.signal-line {
+  height: 1px;
+  background: var(--blue-dim);
+  width: 100%;
+  animation: signal-trace 3s infinite linear;
+}
+
+.intel-report-header {
+  border-bottom: 1px solid var(--onyx-border);
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.intel-status-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  text-transform: uppercase;
 }
 
 .intel-stat-val:hover {

@@ -1221,13 +1221,15 @@ window.doGenerate = async function() {
 
   document.getElementById('output-actions').style.display = 'flex';
 
-  // Show insight if blockers
-  if (programData.blockers.length > 10) {
-    document.getElementById('insight-card-wrap').innerHTML = `
-      <div class="insight-card">
-        <div class="insight-label">${ICONS.warning} AI risk insight</div>
-        <div class="insight-body">Blockers detected in this update. Your executive output includes an escalation flag. Consider scheduling a sync or creating a risk in Risk Radar.</div>
-      </div>`;
+  // Show dynamic insight if blockers or red RAG
+  if (programData.blockers.length > 5 || sg.selectedRag === 'red') {
+    generateStatusInsight(programData, (insight) => {
+      document.getElementById('insight-card-wrap').innerHTML = `
+        <div class="insight-card animate-slide-up">
+          <div class="insight-label">${ICONS.warning} AI strategic insight</div>
+          <div class="insight-body">${insight}</div>
+        </div>`;
+    });
   }
 
   setButtonLoading(btn, false, `${ICONS.generate} Generate status updates`);
@@ -3168,34 +3170,67 @@ function renderShadowDetector() {
 
       <div class="intel-header">
         <h1 class="page-title">Shadow Patterns</h1>
-        <p class="page-subtitle">Multi-surface data synthesis to detect hidden systemic bottlenecks across the portfolio.</p>
+        <p class="page-subtitle">Multi-surface neural synthesis to detect hidden systemic bottlenecks across the portfolio.</p>
       </div>
 
-      <div class="intel-card p-60 text-center animate-slide-up" id="synthesis-start">
-        <div class="scan-zone-visual mb-40">
-          <div class="radar-scan-graphic" style="width:180px; height:180px; filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));">
-            <div class="radar-pulse"></div>
-            <div class="radar-hand" style="background: linear-gradient(to top, rgba(59, 130, 246, 0.8), transparent);"></div>
+      <div class="intel-card mb-40 animate-slide-up" id="synthesis-start" style="position:relative; overflow:hidden;">
+        <div class="pixel-grain"></div>
+        
+        <div class="grid lg:grid-cols-2 gap-48" style="padding:48px; align-items:center;">
+          <!-- Left Column: Tactical Control -->
+          <div class="flex flex-col gap-24">
+            <div class="flex items-center gap-12 mb-12">
+              <span class="intel-status-pill" style="color:var(--blue-light); background:rgba(59, 130, 246, 0.1);">SYS_READY</span>
+              <span class="tactical-mono opacity-40 text-xs">NEURAL_SYNC: 99.8%</span>
+            </div>
+
+            <h2 class="tactical-mono font-800 text-3xl letter-spacing-2" style="color:var(--text-primary); text-shadow: 0 0 10px rgba(255,255,255,0.1);">
+              SYNAPTIC SYNTHESIS PROTOCOL
+            </h2>
+            
+            <p class="color-secondary opacity-70" style="line-height:1.7; font-size:15px; max-width:500px;">
+              Initiate a global portfolio scan to detect hidden correlations across cross-team dependencies, underlying systemic risks, and historical decision metadata.
+            </p>
+
+            <div class="flex items-center gap-32 mt-12">
+              <button id="start-synthesis" class="intel-btn-premium" style="padding:18px 48px; min-width:280px;">
+                <span class="pulse-dot" style="width:8px; height:8px; background:var(--blue-light);"></span>
+                Initiate Deep Portfolio Scan
+              </button>
+            </div>
+          </div>
+
+          <!-- Right Column: Neural Visualization -->
+          <div class="flex items-center justify-center p-32" style="background:rgba(255,255,255,0.02); border-radius:32px; border:1px solid rgba(255,255,255,0.05);">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:32px; width:100%;">
+              <div class="synaptic-radar">
+                <div class="radar-sweep-hand"></div>
+                <div style="position:absolute; top:20%; left:30%; width:4px; height:4px; background:#fff; border-radius:50%; opacity:0.5; filter:blur(1px);"></div>
+                <div style="position:absolute; top:60%; left:70%; width:4px; height:4px; background:#fff; border-radius:50%; opacity:0.3; filter:blur(1px);"></div>
+                <div style="position:absolute; top:40%; left:10%; width:3px; height:3px; background:#fff; border-radius:50%; opacity:0.4;"></div>
+              </div>
+              
+              <div class="hud-signal-trace w-full">
+                <div class="signal-line" style="animation-delay:0s; width:80%;"></div>
+                <div class="signal-line" style="animation-delay:0.5s; width:40%;"></div>
+                <div class="signal-line" style="animation-delay:1.2s; width:90%;"></div>
+                <div class="signal-line" style="animation-delay:0.8s; width:60%;"></div>
+              </div>
+            </div>
           </div>
         </div>
-        <h2 class="font-800 text-2xl mb-16 letter-spacing-1">SYNAPTIC SYNTHESIS PROTOCOL</h2>
-        <p class="color-secondary mb-32 max-w-600 mx-auto opacity-70" style="line-height:1.6;">Initiate a global portfolio scan to detect correlations across cross-team dependencies, hidden risks, and legacy decision logs.</p>
-        <button id="start-synthesis" class="intel-btn-premium" style="margin:0 auto; padding:18px 48px;">
-          <span class="pulse-dot" style="width:8px; height:8px; background:var(--blue-light);"></span>
-          Initiate Deep Portfolio Scan
-        </button>
       </div>
 
       <div id="synthesis-result" class="animate-fade-in" style="display:none; position:relative; margin-top:40px;">
         <div class="scan-line"></div>
-        <div class="intel-card p-48" id="synthesis-output" style="min-height:500px; background:rgba(10, 15, 25, 0.9); border-color:rgba(59, 130, 246, 0.2);"></div>
+        <div class="intel-card p-48" id="synthesis-output" style="min-height:500px; background:rgba(10, 15, 25, 0.98); border-color:rgba(59, 130, 246, 0.3);"></div>
       </div>
     </div>
   `;
 
   document.getElementById('start-synthesis').onclick = () => {
     const btn = document.getElementById('start-synthesis');
-    setButtonLoading(btn, true, 'Synthesizing Neural Patterns...');
+    setButtonLoading(btn, true, 'SYNTHESIZING NEURAL PATTERNS...');
     
     const output = document.getElementById('synthesis-output');
     document.getElementById('synthesis-result').style.display = 'block';
@@ -3206,7 +3241,7 @@ function renderShadowDetector() {
       risks: getActiveRisks(),
       decisions: getDecisions()
     }, output, () => {
-      setButtonLoading(btn, false, 'Re-Initiate Synthesis');
+      setButtonLoading(btn, false, 'INITIATE DEEP SCAN');
     });
   };
 }

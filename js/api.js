@@ -499,82 +499,177 @@ function getMockText(persona, data) {
   const rag = data.rag || 'green';
   const name = data.name || 'Sample Program';
   const blockers = data.blockers || 'None';
+  const decisions = data.decisions || '';
+  const milestones = data.milestones || '';
+  
+  // Dynamic Synthesizer: Extract value from user inputs
+  const extractPoints = (input, count = 2) => {
+    if (!input || input.length < 5) return null;
+    return input.split('.')
+      .filter(s => s.trim().length > 10)
+      .slice(0, count)
+      .map(s => s.trim());
+  };
+
+  const synthesizedWorking = extractPoints(decisions) || extractPoints(milestones) || [
+    "Stakeholder alignment secured for Phase 2 scope.",
+    "Core system integration tracking ahead of schedule."
+  ];
+
+  const openingTemplates = {
+    exec: [
+      `Program is currently ${rag === 'green' ? 'on track for all Q2 milestones' : rag === 'amber' ? 'facing minor headwinds but manageable' : 'at critical risk due to infrastructure dependencies'}.`,
+      `The portfolio health for ${name} is ${rag === 'green' ? 'nominal' : 'under technical review'} based on latest sprint metrics.`,
+      `${name} has completed 85% of core path initiatives with ${rag === 'green' ? 'high confidence' : 'monitored risk'}.`
+    ]
+  };
+
+  const getRand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
   const mocks = {
-    exec: `**Status: ${rag.toUpperCase()} | ${name} | Week of April 14**
+    exec: `**Status: ${rag.toUpperCase()} | ${name} | Week of ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}**
 
-**Bottom line up front:** Program is currently ${rag === 'green' ? 'on track for all Q2 milestones' : rag === 'amber' ? 'facing minor headwinds but manageable' : 'at critical risk due to infrastructure dependencies'}.
+**Bottom line up front:** ${getRand(openingTemplates.exec)}
 
 **What's working:**
-- Core system integration completed ahead of schedule.
-- Stakeholder alignment secured for Phase 2 scope.
-- Velocity remained steady at 42 points per sprint.
+- ${synthesizedWorking[0]}
+- ${synthesizedWorking[1] || 'Velocity remains steady at 42 points per sprint.'}
+- Cross-functional sync completed for upcoming launch.
 
 **Key risks / blockers:**
 ${rag === 'green' ? '- No active blockers — executing to plan.' : `- ${blockers}`}
 
-**Decision needed:** ${rag === 'red' ? 'Approval for 2 additional contractors to accelerate remediation.' : 'None at this time.'}
+**Strategic Decision:** ${decisions.length > 5 ? decisions : (rag === 'red' ? 'Approval for remediation headcount required.' : 'None at this time.')}
 
-**Next checkpoint:** April 28 — Staging validation results will be shared.`,
+**Next checkpoint:** ${new Date(Date.now() + 604800000).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} — Review of staging results.`,
 
-    pm: `${name} is currently ${rag === 'green' ? 'tracking well against our Q2 commitments' : 'facing some challenges that we are actively managing'}. We've made significant progress on the core feature set, with engineering completion at roughly 75%.
+    pm: `${name} is currently ${rag === 'green' ? 'tracking well against our Q2 commitments' : 'facing some challenges that we are actively managing'}. 
 
-The primary focus right now is ${data.milestones || 'the upcoming staging release'}. We have a minor dependency on the SEO team for content tags, but that shouldn't impact our critical path.
+The primary focus right now is ${milestones.length > 5 ? milestones : 'the upcoming production hardening'}. We've made significant progress on the core feature set.
 
 ${rag !== 'green' ? `**Blocker detail:** ${blockers}` : 'No major blockers at this stage.'}
 
-**I need from you:** Final sign-off on the revised V2 documentation by end of week so we can stay on schedule.`,
+**Decision focus:** ${decisions.length > 5 ? decisions : 'Finalizing V2 documentation.'}
 
-    eng: `**${name} — Sprint Update | April 14**
+**Launch Integrity:** High confidence in meeting the primary market window.`,
+
+    eng: `**${name} — Sprint Sync | ${new Date().toLocaleDateString()}**
 
 **This period:**
-- Completed migration of the legacy auth service to the new JWT-based system.
-- Refactored the data ingestion pipeline to reduce latency by 40%.
-- Fixed 12 high-priority bugs identified during the internal alpha.
+- ${decisions.length > 5 ? decisions.slice(0, 80) + '...' : 'Completed migration of legacy auth components.'}
+- Refactored ingestion pipeline to reduce latency by 15%.
+- Addressed priority-1 defects from internal test bed.
 
 **Blockers — ${rag === 'green' ? '0' : '1'} active:**
-- [Blocker]: ${blockers}. Impact: Potential delay to the API hardening milestone.
+- [Blocker]: ${blockers}.
 
 **Next sprint:**
-- Finalize the rate-limiting middleware.
-- Implement end-to-end testing for the checkout flow.
+- Finalize rate-limiting middleware.
+- ${milestones.length > 5 ? milestones.slice(0, 60) : 'Implement E2E testing for checkout flow.'}
 
-**Action items:**
-- @frontend: Please review the updated GraphQL schema by Wednesday.
-- @devops: We need the staging environment credentials updated.`,
+**Status:** System remains ${rag === 'green' ? 'stable' : 'under monitoring'}.`,
 
     steering: `**Program Steering Committee | ${name}**
 *Internal Roadmap & Governance Report*
 
 **Schedule Status:** ${rag.toUpperCase()}
-**Milestone:** ${data.milestone || 'Alpha Release'} is currently tracking ${rag === 'green' ? 'on schedule' : 'at risk'}.
+**Primary Milestone:** Tracking ${rag === 'green' ? 'on schedule' : 'at risk'}.
 
 **Steering Brief:**
-The program is entering the final stability phase. We are monitoring resource availability for Q4, but currently have sufficient coverage for the primary path.
+${name} is entering the stability phase. Current trajectory shows ${rag === 'green' ? 'sufficient coverage' : 'resource gaps'} for the primary path.
 
 **Committee Updates:**
-- Budget utilization remains within 2% of forecast.
-- Vendor contract for data-lake expansion has been finalized.
-- Steering sign-off required for the revised launch date of Phase 3.`,
+- ${synthesizedWorking[0]}
+- Budget utilization remains within 3% of forecast.
+- Steering sign-off required for for: ${decisions.length > 5 ? decisions : 'Revised launch date of Phase 3.'}`,
 
-    finance: `**Financial Health & ROI Briefing | ${name}**
+    finance: `**Financial Health Briefing | ${name}**
 
 **Fiduciary Status:** ${rag === 'green' ? 'STABLE' : 'WATCH'}
 **Budget Utilization:** 68% (Tracking to plan)
 
 **Economic Impact:**
-The ${name} program remains a primary driver for our Q4 efficiency targets. Current projections suggest a 1.2x ROI on the cloud-cost optimization layer once fully deployed.
+The ${name} initiative remains a primary driver for Q4 targets. 
 
 **Fiscal Risks:**
-- AWS egress costs are trending 5% higher than modeled; under technical review.
-- ${rag === 'red' ? 'Critical: Infrastructure spend has spiked due to emergency scaling.' : 'No major cost overruns.'}
+- Infrastructure spend is ${rag === 'red' ? 'spiking' : 'nominal'}.
+- ${rag === 'red' ? `Blocker Impact: ${blockers}` : 'No major cost overruns.'}
 
-**ROI Milestones:**
-- [X] Infrastructure cost-reduction baseline established.
-- [ ] Phase 2 automation ROI validation — Due May 20.`
+**Strategic focus:** ${decisions.length > 5 ? decisions : 'Automation ROI validation.'}`
   };
 
   return mocks[persona] || mocks.exec;
+}
+
+/**
+ * generateStatusInsight — Provides a one-sentence strategic AI insight
+ */
+export async function generateStatusInsight(programData, onDone) {
+  const provider = getProvider();
+  const apiKey = getApiKey(provider);
+  const rag = programData.rag || 'green';
+
+  if (!apiKey || apiKey === MOCK_KEY) {
+    const mockInsights = {
+      green: [
+        "Infrastructure health is nominal; focus on documentation throughput for Q3 readiness.",
+        "Program trajectory is stable. Consider early-stage preparation for the next milestone.",
+        "Velocity is consistent. No immediate strategic intervention requested."
+      ],
+      amber: [
+        "Risk detection triggered: Dependency bottleneck likely affecting the secondary critical path.",
+        "Milestone slippage risk detected. Suggest a resource re-alignment sync with Engineering.",
+        "Wait-state identified in decisions. Decision inertia may impact late-Q2 deliverables."
+      ],
+      red: [
+        "CRITICAL: Primary critical path has diverged. Immediate SteerCo escalation recommended.",
+        "RESOURCE ALERT: Blocker depth exceeds remediation capacity. Re-scoping required.",
+        "Strategic Failure Detected: Blocker impact is cascading to downstream initiatives."
+      ]
+    };
+    const pool = mockInsights[rag] || mockInsights.green;
+    const insight = pool[Math.floor(Math.random() * pool.length)];
+    setTimeout(() => onDone(insight), 400);
+    return;
+  }
+
+  const systemPrompt = "You are a Strategic Risk Bot. Analyze a TPM status update and provide ONE SENTENCE of high-value strategic insight or a warning. Max 25 words.";
+  const userPrompt = `RAG: ${rag}\nBlockers: ${programData.blockers}\nDecisions: ${programData.decisions}\nProvide status insight.`;
+
+  try {
+    if (provider === 'gemini') {
+      const resp = await fetch(`${API_URLS.gemini}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] }
+        })
+      });
+      const data = await resp.json();
+      onDone(data.candidates?.[0]?.content?.parts?.[0]?.text || "Risk analysis completed.");
+    } else {
+      const resp = await fetch(API_URLS.anthropic, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: MODELS.anthropic,
+          max_tokens: 100,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        })
+      });
+      const data = await resp.json();
+      onDone(data.content?.[0]?.text || "Risk analysis completed.");
+    }
+  } catch {
+    onDone("Risk analysis completed. No immediate critical concerns.");
+  }
 }
 
 // ── FORMAT OUTPUT ─────────────────────────────────────────────────
