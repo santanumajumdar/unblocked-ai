@@ -13,7 +13,8 @@ import {
 
 import {
   generateStatusUpdate, extractProgramSignals, getApiKey, setApiKey, clearApiKey, hasApiKey,
-  getProvider, setProvider, analyzeSentiment, processTranscript
+  getProvider, setProvider, analyzeSentiment, processTranscript,
+  generatePerspectiveBriefing, generateShadowAnalysis, generateBlastRadiusReport, generateExecutiveBriefing, generateForensicAudit
 } from './api.js';
 
 import {
@@ -51,11 +52,25 @@ const state = {
     outputs: {}       // { persona: htmlString }
   },
   programForm: null,  // program being edited/created
+  jarvis: {
+    open: false,
+    generating: false,
+    history: [],
+    voiceMode: false
+  }
 };
+
+import { jarvisVoice } from './voice.js';
+import { setupJarvisV2 } from './jarvis_v2.js';
+import { getJarvisHistory } from './jarvis.js';
+state.jarvis.history = getJarvisHistory();
 
 // ── INIT ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   renderApp();
+  setupJarvisV2(state, { 
+    saveProgram, saveDecision, getPrograms, getActiveRisks, getDecisions, getSimulatedPrograms 
+  });
   // Restore last page
   const lastPage = sessionStorage.getItem('unblocked_page') || 'landing';
   if (lastPage !== 'landing' && hasApiKey()) {
@@ -70,6 +85,13 @@ export function showPage(page) {
   const el = document.getElementById(`page-${page}`);
   if (el) el.classList.add('active');
   state.page = page;
+  
+  // Track state for layout-aware CSS (footer alignment)
+  if (page === 'app') {
+    document.body.classList.add('dashboard-active');
+  } else {
+    document.body.classList.remove('dashboard-active');
+  }
 }
 
 export function showAppPage(name) {
@@ -102,6 +124,9 @@ function renderPage(name) {
     monitoring: renderMonitoring,
     coaching:   () => renderCoaching(document.getElementById('apppage-coaching'), showAppPage),
     decisions:  renderDecisions,
+    mirror:     renderPerspectiveMirror,
+    synthesis:  renderShadowDetector,
+    cascade:    renderBlastRadius,
     settings:  renderSettings
   };
   if (renders[name]) renders[name]();
@@ -294,8 +319,11 @@ function renderApp() {
           <div id="apppage-programs"  class="app-page"></div>
           <div id="apppage-history"   class="app-page"></div>
           <div id="apppage-risks"     class="app-page"></div>
-           <div id="apppage-visuals"   class="app-page"></div>
+          <div id="apppage-visuals"   class="app-page"></div>
           <div id="apppage-integrations" class="app-page"></div>
+          <div id="apppage-mirror"       class="app-page"></div>
+          <div id="apppage-synthesis"    class="app-page"></div>
+          <div id="apppage-cascade"      class="app-page"></div>
           <div id="apppage-monitoring"   class="app-page"></div>
           <div id="apppage-coaching"     class="app-page"></div>
           <div id="apppage-decisions"    class="app-page"></div>
@@ -315,7 +343,7 @@ function renderApp() {
 function renderLanding() {
   return `
   <div class="landing-hero">
-    <div class="landing-eyebrow">Free forever &middot; Built for TPMs</div>
+    <div class="landing-eyebrow">Unblocked AI &mdash; Status Intelligence for TPMs</div>
     <h1 class="landing-h1">Status updates that<br><em>write themselves</em></h1>
     <p class="landing-sub">Unblocked AI turns your program signals into role-aware narratives — for execs, engineers, PMs, and steering committees. In seconds, not hours.</p>
     <div class="landing-cta">
@@ -524,8 +552,15 @@ function renderSidebar() {
       <div class="nav-item" id="nav-programs"  data-page="programs">${ICONS.programs} My Programs</div>
       <div class="nav-item" id="nav-history"   data-page="history">${ICONS.history} Update History</div>
       <div class="nav-item" id="nav-risks"     data-page="risks">${ICONS.risks} Risk Radar <span class="nav-pill nav-pill-red" id="risk-count-badge"></span></div>
-       <div id="nav-visuals"   data-page="visuals" class="nav-item">${ICONS.visuals} Portfolio Visuals <span class="nav-pill nav-pill-blue">NEW</span></div>
+      
+      <div class="nav-label" style="margin-top:10px;">Intelligence</div>
+      <div id="nav-mirror"     data-page="mirror"     class="nav-item">👥 Perspective Mirror <span class="nav-pill nav-pill-blue">AI</span></div>
+      <div id="nav-synthesis"  data-page="synthesis"  class="nav-item">🔍 Shadow Patterns <span class="nav-pill nav-pill-blue">AI</span></div>
+      <div id="nav-cascade"    data-page="cascade"    class="nav-item">🧨 Blast Radius <span class="nav-pill nav-pill-blue">AI</span></div>
       <div id="nav-monitoring" data-page="monitoring" class="nav-item">${ICONS.generate} AI Insights <span class="nav-pill nav-pill-blue">BETA</span></div>
+      
+      <div class="nav-label" style="margin-top:10px;">Tools</div>
+      <div id="nav-visuals"   data-page="visuals" class="nav-item">${ICONS.visuals} Portfolio Visuals <span class="nav-pill nav-pill-blue">NEW</span></div>
       <div id="nav-coaching"   data-page="coaching"   class="nav-item">🛡️ TPM Coaching <span class="nav-pill nav-pill-blue">BETA</span></div>
       <div id="nav-decisions"  data-page="decisions"  class="nav-item">📜 Decision Registry</div>
       <div id="nav-integrations" data-page="integrations" class="nav-item">${ICONS.slack} Integrations</div>
@@ -647,49 +682,58 @@ function renderDashboard() {
 
       <div class="divider"></div>
       
-      <div class="mb-24">
-        <div class="font-500 mb-12" style="font-size:14px;">Strategic Alignment Distribution</div>
-        <div class="card" style="padding:20px;">
-          <div class="flex items-center gap-24">
-            ${(() => {
-              const pillars = getStrategicPillars();
-              const scores = programs.map(p => calculateAlignmentScore(p, pillars));
-              const high = scores.filter(s => s >= 80).length;
-              const med = scores.filter(s => s >= 50 && s < 80).length;
-              const low = scores.filter(s => s < 50).length;
-              const total = scores.length || 1;
+      <div class="mb-40">
+        <div class="font-500 mb-16" style="font-size:14px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.04em;">Strategic Alignment Distribution</div>
+        <div class="card" style="padding:28px 32px; background:rgba(255,255,255,0.01); border-color:var(--glass-border);">
+          ${(() => {
+            const pillars = getStrategicPillars();
+            const scores = programs.map(p => calculateAlignmentScore(p, pillars));
+            const high = scores.filter(s => s >= 80).length;
+            const med = scores.filter(s => s >= 50 && s < 80).length;
+            const low = scores.filter(s => s < 50).length;
+            const total = scores.length || 1;
+            
+            const pHigh = (high / total) * 100;
+            const pMed = (med / total) * 100;
+            const pLow = (low / total) * 100;
+
+            return `
+              <div class="quantum-legend">
+                <div class="legend-item">
+                  <div class="legend-dot high"></div>
+                  <div>
+                    <div class="legend-label">High Alignment</div>
+                    <div class="legend-count" style="color:var(--success)">${high} <span style="font-size:11px; font-weight:400; opacity:0.6">programs</span></div>
+                  </div>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot med"></div>
+                  <div>
+                    <div class="legend-label">Moderate</div>
+                    <div class="legend-count" style="color:var(--blue-light)">${med} <span style="font-size:11px; font-weight:400; opacity:0.6">programs</span></div>
+                  </div>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot low"></div>
+                  <div>
+                    <div class="legend-label">Low / Unknown</div>
+                    <div class="legend-count" style="color:var(--warn)">${low} <span style="font-size:11px; font-weight:400; opacity:0.6">programs</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="quantum-bar-container">
+                <div class="quantum-segment high" style="width:${pHigh}%" title="High Alignment: ${high} programs"></div>
+                <div class="quantum-segment med" style="width:${pMed}%" title="Moderate: ${med} programs"></div>
+                <div class="quantum-segment low" style="width:${pLow}%" title="Low / Unknown: ${low} programs"></div>
+              </div>
               
-              return `
-                <div style="flex:1;">
-                   <div class="flex items-center justify-between text-xs mb-6">
-                     <span class="color-muted">High Alignment (80%+)</span>
-                     <span class="font-600" style="color:var(--success)">${high} programs</span>
-                   </div>
-                   <div style="height:6px; background:var(--border); border-radius:10px; overflow:hidden;">
-                     <div style="width:${(high/total)*100}%; height:100%; background:var(--success);"></div>
-                   </div>
-                </div>
-                <div style="flex:1;">
-                   <div class="flex items-center justify-between text-xs mb-6">
-                     <span class="color-muted">Moderate (50-79%)</span>
-                     <span class="font-600" style="color:var(--blue-light)">${med} programs</span>
-                   </div>
-                   <div style="height:6px; background:var(--border); border-radius:10px; overflow:hidden;">
-                     <div style="width:${(med/total)*100}%; height:100%; background:var(--blue-light);"></div>
-                   </div>
-                </div>
-                <div style="flex:1;">
-                   <div class="flex items-center justify-between text-xs mb-6">
-                     <span class="color-muted">Low / Unknown (<50%)</span>
-                     <span class="font-600" style="color:var(--warn)">${low} programs</span>
-                   </div>
-                   <div style="height:6px; background:var(--border); border-radius:10px; overflow:hidden;">
-                     <div style="width:${(low/total)*100}%; height:100%; background:var(--warn);"></div>
-                   </div>
-                </div>
-              `;
-            })()}
-          </div>
+              <div class="flex items-center justify-between mt-12">
+                <div class="text-xs color-muted">Portfolio Velocity: <span class="text-success font-600">Optimal</span></div>
+                <div class="text-xs color-muted">Systemic Risk: <span class="text-warn font-600">Nominal</span></div>
+              </div>
+            `;
+          })()}
         </div>
       </div>
       <div class="flex items-center justify-between mb-12">
@@ -3030,4 +3074,250 @@ window.showIntegrationModal = function(type) {
       toast(`${type.charAt(0).toUpperCase() + type.slice(1)} disconnected`, 'info');
     };
   }
-};
+}
+
+// ── PERSPECTIVE MIRROR (INTELLIGENCE) ─────────────────────────────
+function renderPerspectiveMirror() {
+  const container = document.getElementById('apppage-mirror');
+  const progs = getPrograms();
+  
+  container.innerHTML = `
+    <div class="intel-page animate-fade-in">
+      <div class="intel-grid-bg"></div>
+      
+      <div class="intel-header">
+        <h1 class="page-title">Stakeholder Perspective Mirror</h1>
+        <p class="page-subtitle">Parallel AI-synthesis of program status for Engineering, Finance, and Product leaders.</p>
+      </div>
+
+      <div class="intel-card p-40 mb-32 animate-slide-up">
+        <div style="display:flex; align-items:flex-end; gap:24px;">
+          <div style="flex:1;">
+            <label class="form-label">Source Program</label>
+            <select id="mirror-prog-select" class="form-control" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1); height:46px;">
+              <option value="">Select a program to reflect...</option>
+              ${progs.map(p => `<option value="${p.id}">${p.emoji} ${p.name}</option>`).join('')}
+            </select>
+          </div>
+          <button id="mirror-btn" class="intel-btn">${ICONS.generate} Reflect Perspectives</button>
+        </div>
+      </div>
+
+      <div id="mirror-results" class="mirror-view-grid" style="display:none; grid-template-columns: repeat(3, 1fr); gap:24px;">
+        <div class="mirror-pane persona-accent-eng animate-slide-up" style="animation-delay:0.1s">
+          <div class="mirror-header">
+            <div style="font-size:24px; margin-bottom:8px;">📦</div>
+            <div style="font-weight:700; font-size:12px; letter-spacing:1px; color:#fff;">ENGINEERING LEAD</div>
+            <div style="font-size:10px; opacity:0.6; margin-top:4px;">TECHNICAL DEBT & VELOCITY</div>
+          </div>
+          <div id="mirror-eng" class="mirror-body"></div>
+        </div>
+
+        <div class="mirror-pane persona-accent-finance animate-slide-up" style="animation-delay:0.2s">
+          <div class="mirror-header">
+            <div style="font-size:24px; margin-bottom:8px;">📈</div>
+            <div style="font-weight:700; font-size:12px; letter-spacing:1px; color:#fff;">FINANCE PARTNER</div>
+            <div style="font-size:10px; opacity:0.6; margin-top:4px;">BURN RATE & CAPITAL ROI</div>
+          </div>
+          <div id="mirror-finance" class="mirror-body"></div>
+        </div>
+
+        <div class="mirror-pane persona-accent-pm animate-slide-up" style="animation-delay:0.3s">
+          <div class="mirror-header">
+            <div style="font-size:24px; margin-bottom:8px;">🎨</div>
+            <div style="font-weight:700; font-size:12px; letter-spacing:1px; color:#fff;">PRODUCT PARTNER</div>
+            <div style="font-size:10px; opacity:0.6; margin-top:4px;">VALUE IMPACT & ROADMAP</div>
+          </div>
+          <div id="mirror-pm" class="mirror-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      .mirror-view-grid { display: grid; }
+      @media(max-width: 1200px) { .mirror-view-grid { grid-template-columns: 1fr !important; } }
+    </style>
+  `;
+
+  document.getElementById('mirror-btn').onclick = () => {
+    const progId = document.getElementById('mirror-prog-select').value;
+    if (!progId) { toast('Please select a program', 'info'); return; }
+    const prog = getProgramById(progId);
+    if (!prog) return;
+
+    document.getElementById('mirror-results').style.display = 'grid';
+    ['eng', 'finance', 'pm'].forEach(p => {
+      document.getElementById(`mirror-${p}`).innerHTML = '<div class="pulse-row"><div class="pulse-dot"></div><span>Synthesizing...</span></div>';
+    });
+
+    generatePerspectiveBriefing(prog, 'eng', document.getElementById('mirror-eng'));
+    generatePerspectiveBriefing(prog, 'finance', document.getElementById('mirror-finance'));
+    generatePerspectiveBriefing(prog, 'pm', document.getElementById('mirror-pm'));
+  };
+}
+
+// ── SHADOW PATTERNS DETECTOR (INTELLIGENCE) ───────────────────────
+function renderShadowDetector() {
+  const container = document.getElementById('apppage-synthesis');
+  
+  container.innerHTML = `
+    <div class="intel-page animate-fade-in">
+      <div class="intel-grid-bg"></div>
+
+      <div class="intel-header">
+        <h1 class="page-title">Shadow Patterns Detector</h1>
+        <p class="page-subtitle">Cross-program data synthesis to detect hidden systemic bottlenecks.</p>
+      </div>
+
+      <div class="intel-card p-60 text-center animate-slide-up" id="synthesis-start">
+        <div class="scan-zone-visual mb-40">
+          <div class="radar-scan-graphic" style="width:160px; height:160px; scale:1.2;">
+            <div class="radar-pulse"></div>
+            <div class="radar-hand"></div>
+          </div>
+        </div>
+        <h2 class="font-700 text-2xl mb-12">Systemic Synthesis Protocol</h2>
+        <p class="color-secondary mb-32 max-w-600 mx-auto opacity-70">Initiate global portfolio scan to detect correlations across dependencies, risks, and decision logs.</p>
+        <button id="start-synthesis" class="intel-btn" style="margin:0 auto; padding:16px 40px; font-size:16px;">
+          <span class="pulse-dot" style="width:8px; height:8px; background:#fff;"></span>
+          Initiate Deep Portfolio Scan
+        </button>
+      </div>
+
+      <div id="synthesis-result" class="animate-fade-in" style="display:none; position:relative;">
+        <div class="scan-line"></div>
+        <div class="intel-card p-40" id="synthesis-output" style="min-height:400px; background:rgba(10,10,15,0.85);"></div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('start-synthesis').onclick = () => {
+    const btn = document.getElementById('start-synthesis');
+    setButtonLoading(btn, true, 'Synthesizing Patterns...');
+    
+    const output = document.getElementById('synthesis-output');
+    document.getElementById('synthesis-result').style.display = 'block';
+    output.scrollIntoView({ behavior: 'smooth' });
+
+    generateShadowAnalysis({
+      programs: getPrograms(),
+      risks: getActiveRisks(),
+      decisions: getDecisions()
+    }, output, () => {
+      setButtonLoading(btn, false, 'Re-Initiate Protocol');
+    });
+  };
+}
+
+// ── BLAST RADIUS ANALYSIS (INTELLIGENCE) ──────────────────────────
+function renderBlastRadius() {
+  const container = document.getElementById('apppage-cascade');
+  const progs = getPrograms();
+
+  container.innerHTML = `
+    <div class="intel-page animate-fade-in">
+      <div class="intel-grid-bg"></div>
+
+      <div class="intel-header">
+        <h1 class="page-title">Blast Radius Analysis</h1>
+        <p class="page-subtitle">Simulate program slippage to calculate the cascading impact across dependencies.</p>
+      </div>
+
+      <div class="intel-card p-32 mb-32 animate-slide-up">
+        <div style="display:grid; grid-template-columns: 1fr 1fr auto; gap:32px; align-items:flex-end;">
+          <div>
+            <label class="form-label">Slippage Catalyst</label>
+            <select id="blast-prog-select" class="form-control" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1); height:46px;">
+              ${progs.map(p => `<option value="${p.id}">${p.emoji} ${p.name}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="display:flex; justify-content:space-between;">
+              <span>Delay Magnitude</span>
+              <span id="blast-days-val" style="color:var(--accent-light);">14 Days</span>
+            </label>
+            <input type="range" id="blast-days-input" min="7" max="60" step="7" value="14" class="intel-slider" style="width:100%; margin-top:12px;">
+          </div>
+          <button id="run-blast-sim" class="intel-btn" style="background:linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);">Run Collision Simulation</button>
+        </div>
+      </div>
+
+      <div id="blast-results-area" style="display:none;" class="animate-fade-in">
+        <div class="grid grid-cols-4 gap-24 mb-32">
+          <div class="intel-card p-24 text-center">
+            <div class="intel-stat-val text-danger" id="stat-red-delta">0</div>
+            <div class="intel-stat-lab">New Critical (REDS)</div>
+          </div>
+          <div class="intel-card p-24 text-center">
+            <div class="intel-stat-val text-amber" id="stat-amber-delta">0</div>
+            <div class="intel-stat-lab">New At-Watch (AMBER)</div>
+          </div>
+          <div class="intel-card p-24 text-center">
+            <div class="intel-stat-val text-primary" id="stat-total-shifted">0</div>
+            <div class="intel-stat-lab">Programs Impacted</div>
+          </div>
+          <div class="intel-card p-24 text-center">
+            <div class="intel-stat-val" style="color:#10b981;">HIGH</div>
+            <div class="intel-stat-lab">Simulation Integrity</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-24">
+          <div class="intel-card p-32">
+            <h3 class="text-xs font-700 opacity-50 mb-20 uppercase letter-spacing-1">Cascade Visualization</h3>
+            <div id="blast-impact-list" class="flex flex-col gap-12"></div>
+          </div>
+          <div class="intel-card p-32" style="background:rgba(0,0,0,0.4);">
+             <h3 class="text-xs font-700 opacity-50 mb-20 uppercase letter-spacing-1">Risk AI Briefing</h3>
+             <div id="blast-report-text" class="color-secondary" style="font-size:14px; line-height:1.7;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      .intel-slider { -webkit-appearance: none; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; outline: none; }
+      .intel-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: #fff; border-radius: 50%; cursor: pointer; border: 4px solid var(--accent); box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+    </style>
+  `;
+
+  const dayInput = document.getElementById('blast-days-input');
+  dayInput.oninput = () => { document.getElementById('blast-days-val').textContent = `${dayInput.value} Days`; };
+
+  document.getElementById('run-blast-sim').onclick = () => {
+    const progId = document.getElementById('blast-prog-select').value;
+    const days = parseInt(dayInput.value);
+    
+    document.getElementById('blast-results-area').style.display = 'block';
+    const originalProgs = getPrograms();
+    
+    initSandbox(originalProgs);
+    simulateSlip(progId, days);
+    
+    const simulatedProgs = getSimulatedPrograms(originalProgs);
+    const impact = getSimulationImpact(); // Returns { redDelta, amberDelta, totalShifted }
+
+    // BUG FIX: Correct mapping
+    document.getElementById('stat-red-delta').textContent = impact.redDelta;
+    document.getElementById('stat-amber-delta').textContent = impact.amberDelta;
+    document.getElementById('stat-total-shifted').textContent = impact.totalShifted;
+
+    const listEl = document.getElementById('blast-impact-list');
+    listEl.innerHTML = simulatedProgs
+      .filter((p, i) => p.targetDate !== originalProgs[i].targetDate)
+      .map(p => `
+        <div class="flex items-center justify-between p-12 rounded-xl" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);">
+          <div class="flex items-center gap-12">
+            <span class="rag-dot ${p.rag}"></span>
+            <span class="font-600 text-sm">${p.name}</span>
+          </div>
+          <div class="text-xs color-secondary font-500">
+            <span class="text-danger">→</span> ${p.targetDate}
+          </div>
+        </div>
+      `).join('');
+
+    generateBlastRadiusReport(originalProgs, simulatedProgs, days, document.getElementById('blast-report-text'));
+    resetSandbox();
+  };
+}

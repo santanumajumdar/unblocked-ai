@@ -477,3 +477,46 @@ export function getStats() {
     onTrack: programs.filter(p => p.rag === 'green').length
   };
 }
+
+/**
+ * getHistoryShifts — Forensic analysis of RAG transitions over a specified timeframe
+ */
+export function getHistoryShifts(days = 90) {
+  const history = getHistory()
+    .filter(h => Date.now() - h.createdAt < days * 86400000)
+    .sort((a,b) => a.createdAt - b.createdAt);
+
+  const programs = getPrograms();
+  const shifts = [];
+
+  // Group by program
+  const grouped = history.reduce((acc, h) => {
+    if (!acc[h.programId]) acc[h.programId] = [];
+    acc[h.programId].push(h);
+    return acc;
+  }, {});
+
+  Object.keys(grouped).forEach(programId => {
+    const programHistory = grouped[programId];
+    const program = programs.find(p => p.id === programId) || { name: programHistory[0].programName };
+
+    for (let i = 1; i < programHistory.length; i++) {
+      const prev = programHistory[i-1];
+      const cur  = programHistory[i];
+
+      if (prev.rag !== cur.rag) {
+        shifts.push({
+          programId,
+          programName: program.name,
+          from: prev.rag,
+          to: cur.rag,
+          severity: (cur.rag === 'red' || (prev.rag === 'green' && cur.rag === 'amber')) ? 'high' : 'medium',
+          note: cur.preview || '',
+          timestamp: cur.createdAt
+        });
+      }
+    }
+  });
+
+  return shifts.sort((a,b) => b.timestamp - a.timestamp);
+}

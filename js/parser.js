@@ -75,6 +75,11 @@ export async function parseExcelToJSON(file) {
   return window.XLSX.utils.sheet_to_json(firstSheet);
 }
 
+// Expose globally for non‑module usage (optional)
+if (typeof window !== 'undefined') {
+  window.parseExcelToJSON = parseExcelToJSON;
+}
+
 async function parseWord(file) {
   const arrayBuffer = await file.arrayBuffer();
   const result = await window.mammoth.extractRawText({ arrayBuffer });
