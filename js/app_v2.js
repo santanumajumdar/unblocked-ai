@@ -3086,47 +3086,49 @@ function renderPerspectiveMirror() {
       <div class="intel-grid-bg"></div>
       
       <div class="intel-header">
-        <h1 class="page-title">Stakeholder Perspective Mirror</h1>
-        <p class="page-subtitle">Parallel AI-synthesis of program status for Engineering, Finance, and Product leaders.</p>
+        <h1 class="page-title">Perspective Mirror</h1>
+        <p class="page-subtitle">AI-synthesized strategic briefings tailored for your core stakeholders.</p>
       </div>
 
-      <div class="intel-card p-40 mb-32 animate-slide-up">
-        <div style="display:flex; align-items:flex-end; gap:24px;">
-          <div style="flex:1;">
-            <label class="form-label">Source Program</label>
-            <select id="mirror-prog-select" class="form-control" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1); height:46px;">
-              <option value="">Select a program to reflect...</option>
+      <div class="intel-card mb-40 animate-slide-up" style="padding:32px 40px;">
+        <div style="display:grid; grid-template-columns: 1fr auto; gap:32px; align-items:flex-end;">
+          <div>
+            <label class="form-label" style="margin-bottom:12px; display:block;">Target Source Initiative</label>
+            <select id="mirror-prog-select" class="form-control" style="background:rgba(255,255,255,0.03); border-color:rgba(255,255,255,0.1); height:52px; font-size:15px;">
+              <option value="">Select a program to synthesize...</option>
               ${progs.map(p => `<option value="${p.id}">${p.emoji} ${p.name}</option>`).join('')}
             </select>
           </div>
-          <button id="mirror-btn" class="intel-btn">${ICONS.generate} Reflect Perspectives</button>
+          <button id="mirror-btn" class="intel-btn-premium" style="height:52px;">
+            ${ICONS.generate} Reflect Perspectives
+          </button>
         </div>
       </div>
 
       <div id="mirror-results" class="mirror-view-grid" style="display:none; grid-template-columns: repeat(3, 1fr); gap:24px;">
         <div class="mirror-pane persona-accent-eng animate-slide-up" style="animation-delay:0.1s">
-          <div class="mirror-header">
-            <div style="font-size:24px; margin-bottom:8px;">📦</div>
-            <div style="font-weight:700; font-size:12px; letter-spacing:1px; color:#fff;">ENGINEERING LEAD</div>
-            <div style="font-size:10px; opacity:0.6; margin-top:4px;">TECHNICAL DEBT & VELOCITY</div>
+          <div class="mirror-header" style="background:rgba(96, 165, 250, 0.03); padding: 24px;">
+            <div style="font-size:20px; margin-bottom:12px;">🛠️</div>
+            <div style="font-weight:800; font-size:11px; letter-spacing:2px; color:var(--text-primary);">ENGINEERING LEAD</div>
+            <div style="font-size:9px; color:var(--text-muted); margin-top:6px; letter-spacing:0.5px;">TECH DEBT • VELOCITY • CI/CD</div>
           </div>
           <div id="mirror-eng" class="mirror-body"></div>
         </div>
 
         <div class="mirror-pane persona-accent-finance animate-slide-up" style="animation-delay:0.2s">
-          <div class="mirror-header">
-            <div style="font-size:24px; margin-bottom:8px;">📈</div>
-            <div style="font-weight:700; font-size:12px; letter-spacing:1px; color:#fff;">FINANCE PARTNER</div>
-            <div style="font-size:10px; opacity:0.6; margin-top:4px;">BURN RATE & CAPITAL ROI</div>
+          <div class="mirror-header" style="background:rgba(251, 191, 36, 0.03); padding: 24px;">
+            <div style="font-size:20px; margin-bottom:12px;">🏦</div>
+            <div style="font-weight:800; font-size:11px; letter-spacing:2px; color:var(--text-primary);">FINANCE PARTNER</div>
+            <div style="font-size:9px; color:var(--text-muted); margin-top:6px; letter-spacing:0.5px;">CAPEX • BURN RATE • ROI</div>
           </div>
           <div id="mirror-finance" class="mirror-body"></div>
         </div>
 
         <div class="mirror-pane persona-accent-pm animate-slide-up" style="animation-delay:0.3s">
-          <div class="mirror-header">
-            <div style="font-size:24px; margin-bottom:8px;">🎨</div>
-            <div style="font-weight:700; font-size:12px; letter-spacing:1px; color:#fff;">PRODUCT PARTNER</div>
-            <div style="font-size:10px; opacity:0.6; margin-top:4px;">VALUE IMPACT & ROADMAP</div>
+          <div class="mirror-header" style="background:rgba(167, 139, 250, 0.03); padding: 24px;">
+            <div style="font-size:20px; margin-bottom:12px;">🎯</div>
+            <div style="font-weight:800; font-size:11px; letter-spacing:2px; color:var(--text-primary);">PRODUCT PARTNER</div>
+            <div style="font-size:9px; color:var(--text-muted); margin-top:6px; letter-spacing:0.5px;">ROADMAP • USER VALUE • SCOPE</div>
           </div>
           <div id="mirror-pm" class="mirror-body"></div>
         </div>
@@ -3165,35 +3167,35 @@ function renderShadowDetector() {
       <div class="intel-grid-bg"></div>
 
       <div class="intel-header">
-        <h1 class="page-title">Shadow Patterns Detector</h1>
-        <p class="page-subtitle">Cross-program data synthesis to detect hidden systemic bottlenecks.</p>
+        <h1 class="page-title">Shadow Patterns</h1>
+        <p class="page-subtitle">Multi-surface data synthesis to detect hidden systemic bottlenecks across the portfolio.</p>
       </div>
 
       <div class="intel-card p-60 text-center animate-slide-up" id="synthesis-start">
         <div class="scan-zone-visual mb-40">
-          <div class="radar-scan-graphic" style="width:160px; height:160px; scale:1.2;">
+          <div class="radar-scan-graphic" style="width:180px; height:180px; filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));">
             <div class="radar-pulse"></div>
-            <div class="radar-hand"></div>
+            <div class="radar-hand" style="background: linear-gradient(to top, rgba(59, 130, 246, 0.8), transparent);"></div>
           </div>
         </div>
-        <h2 class="font-700 text-2xl mb-12">Systemic Synthesis Protocol</h2>
-        <p class="color-secondary mb-32 max-w-600 mx-auto opacity-70">Initiate global portfolio scan to detect correlations across dependencies, risks, and decision logs.</p>
-        <button id="start-synthesis" class="intel-btn" style="margin:0 auto; padding:16px 40px; font-size:16px;">
-          <span class="pulse-dot" style="width:8px; height:8px; background:#fff;"></span>
+        <h2 class="font-800 text-2xl mb-16 letter-spacing-1">SYNAPTIC SYNTHESIS PROTOCOL</h2>
+        <p class="color-secondary mb-32 max-w-600 mx-auto opacity-70" style="line-height:1.6;">Initiate a global portfolio scan to detect correlations across cross-team dependencies, hidden risks, and legacy decision logs.</p>
+        <button id="start-synthesis" class="intel-btn-premium" style="margin:0 auto; padding:18px 48px;">
+          <span class="pulse-dot" style="width:8px; height:8px; background:var(--blue-light);"></span>
           Initiate Deep Portfolio Scan
         </button>
       </div>
 
-      <div id="synthesis-result" class="animate-fade-in" style="display:none; position:relative;">
+      <div id="synthesis-result" class="animate-fade-in" style="display:none; position:relative; margin-top:40px;">
         <div class="scan-line"></div>
-        <div class="intel-card p-40" id="synthesis-output" style="min-height:400px; background:rgba(10,10,15,0.85);"></div>
+        <div class="intel-card p-48" id="synthesis-output" style="min-height:500px; background:rgba(10, 15, 25, 0.9); border-color:rgba(59, 130, 246, 0.2);"></div>
       </div>
     </div>
   `;
 
   document.getElementById('start-synthesis').onclick = () => {
     const btn = document.getElementById('start-synthesis');
-    setButtonLoading(btn, true, 'Synthesizing Patterns...');
+    setButtonLoading(btn, true, 'Synthesizing Neural Patterns...');
     
     const output = document.getElementById('synthesis-output');
     document.getElementById('synthesis-result').style.display = 'block';
@@ -3204,7 +3206,7 @@ function renderShadowDetector() {
       risks: getActiveRisks(),
       decisions: getDecisions()
     }, output, () => {
-      setButtonLoading(btn, false, 'Re-Initiate Protocol');
+      setButtonLoading(btn, false, 'Re-Initiate Synthesis');
     });
   };
 }
@@ -3220,64 +3222,80 @@ function renderBlastRadius() {
 
       <div class="intel-header">
         <h1 class="page-title">Blast Radius Analysis</h1>
-        <p class="page-subtitle">Simulate program slippage to calculate the cascading impact across dependencies.</p>
+        <p class="page-subtitle">Impact simulation engine to detect cascading critical path failures across dependencies.</p>
       </div>
 
-      <div class="intel-card p-32 mb-32 animate-slide-up">
-        <div style="display:grid; grid-template-columns: 1fr 1fr auto; gap:32px; align-items:flex-end;">
+      <div class="intel-card mb-40 animate-slide-up" style="padding:32px 40px;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr auto; gap:40px; align-items:flex-end;">
           <div>
-            <label class="form-label">Slippage Catalyst</label>
-            <select id="blast-prog-select" class="form-control" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1); height:46px;">
+            <label class="form-label" style="margin-bottom:12px; display:block;">Simulation Catalyst</label>
+            <select id="blast-prog-select" class="form-control" style="background:rgba(255,255,255,0.03); border-color:rgba(255,255,255,0.1); height:52px; font-size:15px;">
               ${progs.map(p => `<option value="${p.id}">${p.emoji} ${p.name}</option>`).join('')}
             </select>
           </div>
           <div>
-            <label class="form-label" style="display:flex; justify-content:space-between;">
-              <span>Delay Magnitude</span>
-              <span id="blast-days-val" style="color:var(--accent-light);">14 Days</span>
+            <label class="form-label" style="display:flex; justify-content:space-between; margin-bottom:12px;">
+              <span>Impact Magnitude</span>
+              <span id="blast-days-val" style="color:var(--accent-light); font-weight:700;">14 Days</span>
             </label>
-            <input type="range" id="blast-days-input" min="7" max="60" step="7" value="14" class="intel-slider" style="width:100%; margin-top:12px;">
+            <div style="padding: 10px 0;">
+              <input type="range" id="blast-days-input" min="7" max="60" step="7" value="14" class="intel-slider" style="width:100%;">
+            </div>
           </div>
-          <button id="run-blast-sim" class="intel-btn" style="background:linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);">Run Collision Simulation</button>
+          <button id="run-blast-sim" class="intel-btn-premium" style="height:52px; background:rgba(239, 68, 68, 0.1); border-color:rgba(239, 68, 68, 0.3); color:#ef4444;">
+            ${ICONS.risks} Run Collision Simulation
+          </button>
         </div>
       </div>
 
       <div id="blast-results-area" style="display:none;" class="animate-fade-in">
-        <div class="grid grid-cols-4 gap-24 mb-32">
-          <div class="intel-card p-24 text-center">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-24 mb-40">
+          <div class="intel-stat-card">
             <div class="intel-stat-val text-danger" id="stat-red-delta">0</div>
-            <div class="intel-stat-lab">New Critical (REDS)</div>
+            <div class="intel-stat-lab">New Critical Path (REDS)</div>
           </div>
-          <div class="intel-card p-24 text-center">
+          <div class="intel-stat-card">
             <div class="intel-stat-val text-amber" id="stat-amber-delta">0</div>
-            <div class="intel-stat-lab">New At-Watch (AMBER)</div>
+            <div class="intel-stat-lab">New Risks (AMBER)</div>
           </div>
-          <div class="intel-card p-24 text-center">
+          <div class="intel-stat-card">
             <div class="intel-stat-val text-primary" id="stat-total-shifted">0</div>
-            <div class="intel-stat-lab">Programs Impacted</div>
+            <div class="intel-stat-lab">Affected Initiatives</div>
           </div>
-          <div class="intel-card p-24 text-center">
-            <div class="intel-stat-val" style="color:#10b981;">HIGH</div>
-            <div class="intel-stat-lab">Simulation Integrity</div>
+          <div class="intel-stat-card">
+            <div class="intel-stat-val" style="color:#10b981;">98%</div>
+            <div class="intel-stat-lab">Model Integrity</div>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-24">
-          <div class="intel-card p-32">
-            <h3 class="text-xs font-700 opacity-50 mb-20 uppercase letter-spacing-1">Cascade Visualization</h3>
-            <div id="blast-impact-list" class="flex flex-col gap-12"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-32">
+          <div class="intel-card" style="padding:32px;">
+            <h3 class="text-xs font-800 opacity-60 mb-24 uppercase letter-spacing-2" style="color:var(--text-primary);">Cascade Visualization</h3>
+            <div id="blast-impact-list" class="flex flex-col gap-16"></div>
           </div>
-          <div class="intel-card p-32" style="background:rgba(0,0,0,0.4);">
-             <h3 class="text-xs font-700 opacity-50 mb-20 uppercase letter-spacing-1">Risk AI Briefing</h3>
-             <div id="blast-report-text" class="color-secondary" style="font-size:14px; line-height:1.7;"></div>
+          <div class="intel-card" style="padding:32px; background:rgba(10, 15, 25, 0.95);">
+             <h3 class="text-xs font-800 opacity-60 mb-24 uppercase letter-spacing-2" style="color:var(--text-primary);">Risk Synthesis Report</h3>
+             <div id="blast-report-text" class="color-secondary" style="font-size:14px; line-height:1.8; opacity:0.85;"></div>
           </div>
         </div>
       </div>
     </div>
 
     <style>
-      .intel-slider { -webkit-appearance: none; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; outline: none; }
-      .intel-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: #fff; border-radius: 50%; cursor: pointer; border: 4px solid var(--accent); box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+      .intel-slider { -webkit-appearance: none; height: 8px; background: rgba(255,255,255,0.05); border-radius: 10px; outline: none; }
+      .intel-slider::-webkit-slider-thumb { 
+        -webkit-appearance: none; width: 24px; height: 24px; 
+        background: #ef4444; border-radius: 50%; cursor: pointer; 
+        border: 4px solid #fff; box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        transition: transform 0.2s;
+      }
+      .intel-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+      
+      #run-blast-sim:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: #ef4444;
+        box-shadow: 0 0 30px rgba(239, 68, 68, 0.3);
+      }
     </style>
   `;
 
