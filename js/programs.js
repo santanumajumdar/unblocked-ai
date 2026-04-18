@@ -243,26 +243,42 @@ const DEFAULT_DECISIONS = [
 
 // ── PROGRAMS ─────────────────────────────────────────────────────
 export function getPrograms() {
+  const PROGRAMS_KEY = 'unblocked_programs';
   try {
     const raw = localStorage.getItem(PROGRAMS_KEY);
-    let programs = raw ? JSON.parse(raw) : initPrograms();
+    if (!raw) return initPrograms();
     
-    // Migration: ensure targetDate and dependencies exist
+    let programs = JSON.parse(raw);
+    if (!Array.isArray(programs)) {
+      console.error("Program data corrupted. Reverting to baseline safely.");
+      return DEFAULT_PROGRAMS;
+    }
+
+    // Migration logic
     let changed = false;
     programs = programs.map(p => {
       const defaultP = DEFAULT_PROGRAMS.find(dp => dp.id === p.id);
       if (defaultP) {
         if (p.targetDate === undefined) { p.targetDate = defaultP.targetDate || ''; changed = true; }
         if (p.dependencies === undefined) { p.dependencies = defaultP.dependencies || []; changed = true; }
+        if (p.lastUpdated === undefined) { p.lastUpdated = defaultP.lastUpdated; changed = true; }
       } else {
         if (p.targetDate === undefined) { p.targetDate = ''; changed = true; }
         if (p.dependencies === undefined) { p.dependencies = []; changed = true; }
+        if (p.lastUpdated === undefined) { p.lastUpdated = Date.now(); changed = true; }
       }
       return p;
     });
-    if (changed) localStorage.setItem(PROGRAMS_KEY, JSON.stringify(programs));
+
+    if (changed) {
+      localStorage.setItem(PROGRAMS_KEY, JSON.stringify(programs));
+    }
     return programs;
-  } catch { return initPrograms(); }
+  } catch (err) { 
+    console.error("Persistence Retrieval Error:", err);
+    // Return defaults in-memory but DO NOT wipe localStorage automatically
+    return DEFAULT_PROGRAMS; 
+  }
 }
 
 function initPrograms() {
@@ -273,10 +289,17 @@ function initPrograms() {
 export function saveProgram(program) {
   const programs = getPrograms();
   const idx = programs.findIndex(p => p.id === program.id);
-  if (idx > -1) programs[idx] = program;
-  else programs.push(program);
+  
+  const pToSave = { ...program, lastUpdated: Date.now() };
+
+  if (idx > -1) {
+    programs[idx] = pToSave;
+  } else {
+    programs.push(pToSave);
+  }
+  
   localStorage.setItem(PROGRAMS_KEY, JSON.stringify(programs));
-  return program;
+  return pToSave;
 }
 
 export function deleteProgram(id) {
