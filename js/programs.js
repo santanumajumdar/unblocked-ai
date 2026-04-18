@@ -317,10 +317,16 @@ export function newProgramId() {
 
 // ── HISTORY ──────────────────────────────────────────────────────
 export function getHistory() {
+  const HISTORY_KEY = 'unblocked_history';
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? JSON.parse(raw) : initHistory();
-  } catch { return initHistory(); }
+    if (!raw) return initHistory();
+    const history = JSON.parse(raw);
+    return Array.isArray(history) ? history : initHistory();
+  } catch (err) {
+    console.error("History Retrieval Error:", err);
+    return DEFAULT_HISTORY; 
+  }
 }
 
 function initHistory() {
@@ -338,10 +344,16 @@ export function addHistoryEntry(entry) {
 
 // ── RISKS ─────────────────────────────────────────────────────────
 export function getRisks() {
+  const RISKS_KEY = 'unblocked_risks';
   try {
     const raw = localStorage.getItem(RISKS_KEY);
-    return raw ? JSON.parse(raw) : initRisks();
-  } catch { return initRisks(); }
+    if (!raw) return initRisks();
+    const risks = JSON.parse(raw);
+    return Array.isArray(risks) ? risks : initRisks();
+  } catch (err) {
+    console.error("Risks Retrieval Error:", err);
+    return DEFAULT_RISKS;
+  }
 }
 
 function initRisks() {
@@ -365,10 +377,16 @@ export function getActiveRisks() {
 
 // ── DECISIONS ─────────────────────────────────────────────────────
 export function getDecisions() {
+  const DECISIONS_KEY = 'unblocked_decisions';
   try {
     const raw = localStorage.getItem(DECISIONS_KEY);
-    return raw ? JSON.parse(raw) : initDecisions();
-  } catch { return initDecisions(); }
+    if (!raw) return initDecisions();
+    const decisions = JSON.parse(raw);
+    return Array.isArray(decisions) ? decisions : initDecisions();
+  } catch (err) {
+    console.error("Decisions Retrieval Error:", err);
+    return DEFAULT_DECISIONS;
+  }
 }
 
 function initDecisions() {
